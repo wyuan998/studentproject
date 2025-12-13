@@ -161,7 +161,7 @@ export function exportStudents(params: StudentListParams) {
 /**
  * 获取学生选课记录
  */
-export function getStudentEnrollments(studentId: number) {
+export function getStudentEnrollmentList(studentId: number) {
   return request({
     url: `/students/${studentId}/enrollments`,
     method: 'get'
@@ -171,7 +171,7 @@ export function getStudentEnrollments(studentId: number) {
 /**
  * 获取学生成绩
  */
-export function getStudentGrades(studentId: number, params?: { semester?: string }) {
+export function getStudentGradeList(studentId: number, params?: { semester?: string }) {
   return request({
     url: `/students/${studentId}/grades`,
     method: 'get',
