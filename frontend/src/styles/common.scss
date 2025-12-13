@@ -1,0 +1,106 @@
+// 通用样式
+@import './variables.scss';
+
+// 通用容器
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+// 通用间距
+.mt-10 { margin-top: 10px; }
+.mt-20 { margin-top: 20px; }
+.mb-10 { margin-bottom: 10px; }
+.mb-20 { margin-bottom: 20px; }
+.ml-10 { margin-left: 10px; }
+.mr-10 { margin-right: 10px; }
+
+// 通用文本样式
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+.text-primary { color: var(--el-color-primary); }
+.text-success { color: var(--el-color-success); }
+.text-warning { color: var(--el-color-warning); }
+.text-danger { color: var(--el-color-danger); }
+.text-info { color: var(--el-color-info); }
+
+// 通用按钮样式
+.btn-full-width {
+  width: 100%;
+}
+
+// 通用卡片样式
+.card-hover {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+}
+
+// 通用表单样式
+.form-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+// 通用表格样式
+.table-container {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+// 响应式工具类
+.hidden-xs {
+  @media (max-width: 768px) {
+    display: none !important;
+  }
+}
+
+.hidden-sm {
+  @media (min-width: 769px) and (max-width: 992px) {
+    display: none !important;
+  }
+}
+
+.hidden-md {
+  @media (min-width: 993px) and (max-width: 1200px) {
+    display: none !important;
+  }
+}
+
+.hidden-lg {
+  @media (min-width: 1201px) {
+    display: none !important;
+  }
+}
+
+// 滚动条样式
+.custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+
+    &:hover {
+      background: #a8a8a8;
+    }
+  }
+}
