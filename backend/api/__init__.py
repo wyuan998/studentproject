@@ -19,32 +19,30 @@ api = Api(
 )
 
 # 导入所有命名空间
-from api.auth import auth_ns
-from api.users import users_ns
-from api.students import students_ns
-from api.teachers import teachers_ns
-from api.admins import admins_ns
-from api.courses import courses_ns
-from api.enrollments import enrollments_ns
-from api.grades import grades_ns
-from api.messages import messages_ns
-from api.notifications import notifications_ns
-from api.reports import reports_ns
-from api.system import system_ns
+from .auth import auth as auth_ns
+from .users import users as users_ns
+from .students import students as students_ns
+from .teachers import teachers as teachers_ns
+from .admin import admin as admin_ns
+from .courses import courses as courses_ns
+from .enrollments import enrollments as enrollments_ns
+from .grades import grades as grades_ns
+from .messages import messages as messages_ns
+from .system_config import api as system_config_ns
+from .reports import reports as reports_ns
 
 # 注册所有命名空间
 api.add_namespace(auth_ns, path='/auth')
 api.add_namespace(users_ns, path='/users')
 api.add_namespace(students_ns, path='/students')
 api.add_namespace(teachers_ns, path='/teachers')
-api.add_namespace(admins_ns, path='/admins')
+api.add_namespace(admin_ns, path='/admin')
 api.add_namespace(courses_ns, path='/courses')
 api.add_namespace(enrollments_ns, path='/enrollments')
 api.add_namespace(grades_ns, path='/grades')
 api.add_namespace(messages_ns, path='/messages')
-api.add_namespace(notifications_ns, path='/notifications')
+api.add_namespace(system_config_ns, path='/system-config')
 api.add_namespace(reports_ns, path='/reports')
-api.add_namespace(system_ns, path='/system')
 
 # 导出蓝图
 __all__ = ['api_bp']
