@@ -6,7 +6,6 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
 import '@/styles/index.scss'
-import { usePermissionStore } from './stores/permission'
 
 // 创建应用实例
 const app = createApp(App)
@@ -25,10 +24,6 @@ app.use(router)
 app.use(ElementPlus, {
   size: 'default'
 })
-
-// 权限初始化
-const permissionStore = usePermissionStore(pinia)
-permissionStore.initializePermissions()
 
 // 挂载路由
 app.mount('#app')

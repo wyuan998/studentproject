@@ -67,6 +67,10 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/',
+    redirect: '/login'
+  },
+  {
+    path: '/',
     component: () => import('@/layouts/DefaultLayout.vue'),
     redirect: '/dashboard',
     children: [
