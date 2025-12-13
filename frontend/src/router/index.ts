@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
-import { usePermissionStore } from '@/stores/permission'
-import { useUserStore } from '@/stores/user'
 import nprogress from 'nprogress'
+import 'nprogress/nprogress.css'
 
 // 进度条配置
 nprogress.configure({ showSpinner: false })

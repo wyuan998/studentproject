@@ -4,7 +4,7 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
-import router from './router'
+import router from './router/working'
 import '@/styles/index.scss'
 
 // 创建应用实例
@@ -39,4 +39,16 @@ app.config.warnHandler = (msg, vm, info) => {
   console.warn('Global Warning:', msg)
 }
 
-export { app, router, pinia }
+// 简单的应用初始化
+const initApp = async () => {
+  try {
+    console.log('测试应用初始化成功')
+  } catch (error) {
+    console.error('App initialization error:', error)
+  }
+}
+
+// 应用启动后初始化
+setTimeout(initApp, 100)
+
+export { app, pinia }

@@ -1,70 +1,11 @@
 <template>
   <div id="app" class="app-container">
-    <!-- 全局加载遮罩 -->
-    <el-loading
-      v-if="loading"
-      fullscreen
-      :lock="true"
-      text="正在加载..."
-      background-color="rgba(0, 0, 0, 0.7)"
-    />
-
-    <!-- 登录页面直接显示 -->
-    <template v-if="$route.meta.showLayout === false">
-      <router-view />
-    </template>
-
-    <!-- 主应用布局 -->
-    <template v-else>
-      <el-container class="layout-container">
-        <!-- 侧边栏 -->
-        <AppSidebar :collapsed="appStore.sidebarCollapsed" @toggle="appStore.toggleSidebar" />
-
-        <!-- 主体内容 -->
-        <el-container>
-          <!-- 头部 -->
-          <AppHeader />
-
-          <!-- 内容区域 -->
-          <el-main class="main-content">
-            <div class="content-wrapper">
-              <!-- 面包屑 -->
-              <div class="breadcrumb-wrapper">
-                <AppBreadcrumb />
-              </div>
-
-              <!-- 页面内容 -->
-              <div class="page-content">
-                <router-view v-slot="{ Component, route }">
-                  <transition name="fade-transform" mode="out-in">
-                    <keep-alive :include="keepAliveIncludes">
-                      <component :is="Component" :key="route.path" />
-                    </keep-alive>
-                  </transition>
-                </router-view>
-              </div>
-            </div>
-          </el-main>
-        </el-container>
-      </el-container>
-    </template>
+    <SimpleApp />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useAppStore } from '@/stores/app'
-import AppHeader from '@/components/layout/AppHeader.vue'
-import AppSidebar from '@/components/layout/AppSidebar.vue'
-import AppBreadcrumb from '@/components/layout/AppBreadcrumb.vue'
-
-const appStore = useAppStore()
-
-// 需要缓存的路由组件
-const keepAliveIncludes = computed(() => {
-  // 这里可以根据实际需要配置需要缓存的组件名称
-  return ['Dashboard', 'StudentList', 'TeacherList', 'CourseList']
-})
+import SimpleApp from './SimpleApp.vue'
 </script>
 
 <style lang="scss">
