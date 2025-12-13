@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>成绩管理功能测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .test-button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        h2 {
+            color: #555;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 成绩管理功能测试</h1>
+
+    <div class="test-section">
+        <h2>1. 获取成绩列表</h2>
+        <button class="test-button" onclick="testGetGrades()">获取所有成绩</button>
+        <button class="test-button" onclick="testGetGradesWithFilter()">按课程筛选</button>
+        <button class="test-button" onclick="testGetGradesByType()">按考试类型筛选</button>
+        <div id="get-grades-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 创建成绩记录</h2>
+        <button class="test-button" onclick="testCreateGrade()">创建新成绩</button>
+        <div id="create-grade-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 更新成绩记录</h2>
+        <button class="test-button" onclick="testUpdateGrade()">更新成绩</button>
+        <div id="update-grade-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. 发布成绩</h2>
+        <button class="test-button" onclick="testPublishGrade()">发布成绩</button>
+        <div id="publish-grade-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. 成绩统计</h2>
+        <button class="test-button" onclick="testGetStatistics()">获取统计信息</button>
+        <div id="statistics-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>6. 访问成绩管理页面</h2>
+        <button class="test-button" onclick="window.open('http://localhost:3000/grades/list', '_blank')">
+            打开成绩管理页面
+        </button>
+        <p style="margin-top: 15px;">
+            <strong>注意：</strong>确保后端服务运行在 http://localhost:5000，前端服务运行在 http://localhost:3000
+        </p>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        async function makeRequest(url, options = {}) {
+            try {
+                const response = await fetch(API_BASE + url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                const data = await response.json();
+                return {
+                    success: response.ok,
+                    status: response.status,
+                    data: data
+                };
+            } catch (error) {
+                return {
+                    success: false,
+                    error: error.message
+                };
+            }
+        }
+
+        function displayResult(elementId, result, success) {
+            const element = document.getElementById(elementId);
+            element.className = `result ${success ? 'success' : 'error'}`;
+            element.textContent = JSON.stringify(result, null, 2);
+        }
+
+        async function testGetGrades() {
+            const result = await makeRequest('/grades');
+            displayResult('get-grades-result', result, result.success);
+        }
+
+        async function testGetGradesWithFilter() {
+            const result = await makeRequest('/grades?course_id=1');
+            displayResult('get-grades-result', result, result.success);
+        }
+
+        async function testGetGradesByType() {
+            const result = await makeRequest('/grades?exam_type=midterm');
+            displayResult('get-grades-result', result, result.success);
+        }
+
+        async function testCreateGrade() {
+            const gradeData = {
+                student_id: 1,
+                course_id: 1,
+                exam_type: "quiz",
+                exam_name: "Test Quiz",
+                score: 95,
+                max_score: 100,
+                weight: 0.1,
+                semester: "2025-Spring",
+                comments: "Excellent work!",
+                is_published: false
+            };
+
+            const result = await makeRequest('/grades', {
+                method: 'POST',
+                body: JSON.stringify(gradeData)
+            });
+            displayResult('create-grade-result', result, result.success);
+        }
+
+        async function testUpdateGrade() {
+            const updateData = {
+                score: 96,
+                comments: "Updated score - excellent performance!"
+            };
+
+            const result = await makeRequest('/grades/7', {
+                method: 'PUT',
+                body: JSON.stringify(updateData)
+            });
+            displayResult('update-grade-result', result, result.success);
+        }
+
+        async function testPublishGrade() {
+            const result = await makeRequest('/grades/7/publish', {
+                method: 'POST'
+            });
+            displayResult('publish-grade-result', result, result.success);
+        }
+
+        async function testGetStatistics() {
+            const result = await makeRequest('/grades/statistics');
+            displayResult('statistics-result', result, result.success);
+        }
+
+        // 页面加载时自动测试获取成绩列表
+        window.onload = function() {
+            testGetGrades();
+        };
+    </script>
+</body>
+</html>

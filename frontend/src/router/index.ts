@@ -302,7 +302,7 @@ const routes: RouteRecordRaw[] = [
           {
             path: '/grades/list',
             name: 'GradeList',
-            component: () => import('@/views/grade/GradeList.vue'),
+            component: () => import('@/views/GradeManagement.vue'),
             meta: {
               title: '成绩列表',
               icon: 'List',

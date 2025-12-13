@@ -6,8 +6,14 @@ const request = axios.create({
   baseURL: 'http://localhost:5000',
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/json'
-  }
+    'Content-Type': 'application/json;charset=utf-8'
+  },
+  transformRequest: [
+    function (data) {
+      // 确保JSON数据正确编码
+      return JSON.stringify(data)
+    }
+  ]
 })
 
 // 请求拦截器
