@@ -8,7 +8,7 @@
         <el-form-item>
           <el-input
             v-model="form.username"
-            placeholder="用户名 (admin)"
+            placeholder="用户名"
             prefix-icon="User"
             size="large"
           />
@@ -18,7 +18,7 @@
           <el-input
             v-model="form.password"
             type="password"
-            placeholder="密码 (123456)"
+            placeholder="密码"
             prefix-icon="Lock"
             size="large"
             show-password
@@ -43,12 +43,7 @@
         <router-link to="/register" class="link">立即注册</router-link>
       </div>
 
-      <div class="demo-info">
-        <p>演示账号:</p>
-        <p>用户名: admin</p>
-        <p>密码: 123456</p>
       </div>
-    </div>
   </div>
 </template>
 
@@ -62,8 +57,8 @@ const router = useRouter()
 const loading = ref(false)
 
 const form = ref({
-  username: 'admin',
-  password: '123456'
+  username: '',
+  password: ''
 })
 
 const handleLogin = async () => {
@@ -177,16 +172,4 @@ h2 {
   text-decoration: underline;
 }
 
-.demo-info {
-  margin-top: 20px;
-  padding: 15px;
-  background: #f5f7fa;
-  border-radius: 6px;
-  font-size: 12px;
-  color: #606266;
-}
-
-.demo-info p {
-  margin: 4px 0;
-}
 </style>
