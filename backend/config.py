@@ -21,10 +21,13 @@ class Config:
     MYSQL_CHARSET = 'utf8mb4'
 
     # SQLALCHEMY配置
-    SQLALCHEMY_DATABASE_URI = (
-        f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@'
-        f'{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}?charset={MYSQL_CHARSET}'
-    )
+    # 开发环境使用SQLite
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///student_management.db'
+    # 生产环境MySQL配置
+    # SQLALCHEMY_DATABASE_URI = (
+    #     f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@'
+    #     f'{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}?charset={MYSQL_CHARSET}'
+    # )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False
     SQLALCHEMY_ENGINE_OPTIONS = {
