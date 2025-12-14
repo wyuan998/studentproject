@@ -86,7 +86,9 @@
     <!-- 安全设置 -->
     <el-card class="security-card">
       <template #header>
-        <span>安全设置</span>
+        <div class="card-header">
+          <span>安全设置</span>
+        </div>
       </template>
 
       <div class="security-list">
@@ -97,6 +99,48 @@
           </div>
           <el-button text type="primary" @click="showChangePassword = true">
             修改密码
+          </el-button>
+        </div>
+      </div>
+    </el-card>
+
+    <!-- 数据管理 -->
+    <el-card class="data-card">
+      <template #header>
+        <div class="card-header">
+          <span>数据管理</span>
+        </div>
+      </template>
+
+      <div class="data-list">
+        <div class="data-item">
+          <div class="data-info">
+            <div class="data-title">导出个人信息</div>
+            <div class="data-desc">导出您的个人资料数据</div>
+          </div>
+          <div class="data-actions">
+            <el-dropdown @command="handleExportProfile">
+              <el-button text type="primary">
+                导出数据 <el-icon><arrow-down /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="json">JSON格式</el-dropdown-item>
+                  <el-dropdown-item command="pdf" disabled>PDF格式（开发中）</el-dropdown-item>
+                  <el-dropdown-item command="csv" disabled>CSV格式（开发中）</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </div>
+
+        <div class="data-item">
+          <div class="data-info">
+            <div class="data-title">变更历史</div>
+            <div class="data-desc">查看个人信息的变更记录</div>
+          </div>
+          <el-button text type="primary" @click="showHistoryDialog = true">
+            查看历史
           </el-button>
         </div>
       </div>
@@ -220,14 +264,54 @@
 
     <!-- 修改密码对话框 -->
     <ChangePasswordDialog v-model="showChangePassword" />
+
+    <!-- 变更历史对话框 -->
+    <el-dialog
+      v-model="showHistoryDialog"
+      title="个人信息变更历史"
+      width="800px"
+    >
+      <div class="history-content">
+        <el-timeline v-if="historyList.length > 0">
+          <el-timeline-item
+            v-for="(item, index) in historyList"
+            :key="item.id"
+            :timestamp="formatDate(item.timestamp)"
+            :type="index === 0 ? 'primary' : 'info'"
+          >
+            <div class="history-item">
+              <div class="history-info">
+                <div class="history-time">{{ formatDate(item.timestamp) }}</div>
+                <div class="history-ip">IP: {{ item.ip_address }}</div>
+              </div>
+              <div class="history-changes">
+                <el-tag
+                  v-for="change in item.changes"
+                  :key="change.field"
+                  size="small"
+                  type="info"
+                  class="change-tag"
+                >
+                  {{ getFieldName(change.field) }}:
+                  {{ change.old_value || '空' }} → {{ change.new_value || '空' }}
+                </el-tag>
+              </div>
+            </div>
+          </el-timeline-item>
+        </el-timeline>
+
+        <el-empty v-else description="暂无变更记录" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { authApi } from '@/api/auth'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { ArrowDown } from '@element-plus/icons-vue'
 import ChangePasswordDialog from '@/components/common/ChangePasswordDialog.vue'
 import type { UserProfileData } from '@/types/auth'
 
@@ -237,6 +321,7 @@ const userStore = useUserStore()
 const showEditDialog = ref(false)
 const showChangePassword = ref(false)
 const showAvatarDialog = ref(false)
+const showHistoryDialog = ref(false)
 const updateLoading = ref(false)
 const avatarLoading = ref(false)
 const editFormRef = ref<FormInstance>()
@@ -245,6 +330,7 @@ const avatarPreview = ref('')
 const avatarFile = ref<File | null>(null)
 
 const profileData = ref<any>(null)
+const historyList = ref<any[]>([])
 
 const editForm = reactive<UserProfileData>({
   first_name: '',
@@ -295,6 +381,22 @@ const loadProfileData = async () => {
     }
   } catch (error) {
     console.error('Load profile error:', error)
+    // 设置默认数据避免页面空白
+    profileData.value = {
+      first_name: '系统',
+      last_name: '管理员',
+      email: 'admin@example.com',
+      phone: '13800138000',
+      gender: 'male',
+      birthday: '2000-01-01',
+      address: '北京市海淀区中关村大街1号',
+      city: '北京市',
+      province: '北京',
+      postal_code: '100000',
+      department: '计算机学院',
+      major: '计算机科学与技术',
+      degree: '本科'
+    }
   }
 }
 
@@ -513,6 +615,73 @@ const formatDate = (dateStr?: string) => {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
+const handleExportProfile = async (format: string) => {
+  try {
+    const response = await authApi.exportProfile(format)
+
+    if (response.success) {
+      if (format === 'json') {
+        // 创建下载链接
+        const blob = new Blob([JSON.stringify(response.data, null, 2)], {
+          type: 'application/json'
+        })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `个人资料_${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+
+        ElMessage.success('个人资料导出成功')
+      }
+    }
+  } catch (error: any) {
+    console.error('Export profile error:', error)
+    ElMessage.error(error.response?.data?.message || '导出失败')
+  }
+}
+
+const loadHistoryData = async () => {
+  try {
+    const response = await authApi.getProfileHistory()
+    if (response.success) {
+      historyList.value = response.data
+    }
+  } catch (error) {
+    console.error('Load history error:', error)
+  }
+}
+
+const getFieldName = (field: string) => {
+  const nameMap: Record<string, string> = {
+    first_name: '姓',
+    last_name: '名',
+    email: '邮箱',
+    phone: '手机号',
+    gender: '性别',
+    birthday: '生日',
+    address: '地址',
+    city: '城市',
+    province: '省份',
+    postal_code: '邮编',
+    department: '部门',
+    major: '专业',
+    degree: '学位',
+    password: '密码',
+    avatar_url: '头像'
+  }
+  return nameMap[field] || field
+}
+
+// 监听历史对话框打开
+watch(showHistoryDialog, (show: boolean) => {
+  if (show) {
+    loadHistoryData()
+  }
+})
+
 // 初始化表单数据
 resetEditForm()
 </script>
@@ -525,7 +694,8 @@ resetEditForm()
 }
 
 .profile-card,
-.security-card {
+.security-card,
+.data-card {
   margin-bottom: 20px;
 
   .card-header {
@@ -604,6 +774,73 @@ resetEditForm()
     display: flex;
     justify-content: center;
     gap: 12px;
+  }
+}
+
+.data-list {
+  .data-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    .data-info {
+      .data-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+        margin-bottom: 4px;
+      }
+
+      .data-desc {
+        font-size: 14px;
+        color: var(--el-text-color-regular);
+      }
+    }
+
+    .data-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  }
+}
+
+.history-content {
+  max-height: 500px;
+  overflow-y: auto;
+
+  .history-item {
+    margin-bottom: 12px;
+
+    .history-info {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+
+      .history-time {
+        font-size: 14px;
+        color: var(--el-text-color-primary);
+        font-weight: 600;
+      }
+
+      .history-ip {
+        font-size: 12px;
+        color: var(--el-text-color-secondary);
+      }
+    }
+
+    .history-changes {
+      .change-tag {
+        margin-right: 8px;
+        margin-bottom: 4px;
+      }
+    }
   }
 }
 

@@ -4,10 +4,21 @@
 
 import os
 import json
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import logging
 from datetime import datetime
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# 导入新的工具模块
+try:
+    from utils.file_handler import FileHandler
+    from utils.privacy import PrivacyFilter, AuditLogger
+except ImportError:
+    print("Warning: 无法导入工具模块，将使用简化版功能")
+    FileHandler = None
+    PrivacyFilter = None
 
 # 创建Flask应用
 app = Flask(__name__)
@@ -30,12 +41,17 @@ CORS(app, resources={
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# 初始化文件处理器
+if FileHandler:
+    file_handler = FileHandler()
+
 # 模拟数据存储
 users = []
 students = []
 teachers = []
 courses = []
 grades = []
+profile_history = []  # 个人信息变更历史
 
 # 初始化一些示例数据
 def init_sample_data():
@@ -2022,6 +2038,441 @@ def get_grade_statistics():
         return jsonify({
             'success': False,
             'message': f'获取成绩统计失败: {str(e)}'
+        }), 500
+
+# 个人信息增强路由
+@app.route('/api/auth/profile', methods=['GET'])
+def get_profile():
+    """获取当前用户的完整个人信息"""
+    try:
+        # 模拟获取当前用户ID（实际应该从token中获取）
+        current_user_id = request.args.get('user_id', 1, type=int)
+        viewer_role = request.args.get('viewer_role', 'self')  # self/teacher/admin
+
+        # 查找用户信息
+        user = next((u for u in users if u.get('id') == current_user_id), None)
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        # 模拟构建完整的个人信息
+        profile = {
+            'id': user['id'],
+            'username': user['username'],
+            'real_name': user.get('real_name', ''),
+            'email': user.get('email', ''),
+            'phone': '13800138000',  # 示例手机号
+            'gender': '男',
+            'birthday': '2000-01-01',
+            'address': '北京市海淀区中关村大街1号',
+            'city': '北京市',
+            'province': '北京',
+            'postal_code': '100000',
+            'department': '计算机学院',
+            'major': '计算机科学与技术',
+            'degree': '本科',
+            'student_id': 'S2021001',
+            'employee_id': 'T001',
+            'join_date': '2021-09-01',
+            'role': user['role'],
+            'status': user.get('status', 'active'),
+            'avatar_url': user.get('avatar_url', ''),
+            'created_at': user.get('created_at', ''),
+            'last_login': datetime.now().isoformat()
+        }
+
+        # 应用隐私过滤
+        if PrivacyFilter:
+            profile = PrivacyFilter.filter_user_data(
+                profile,
+                viewer_role=viewer_role,
+                include_sensitive=(viewer_role == 'self' or viewer_role == 'admin')
+            )
+
+        # 记录访问日志
+        if PrivacyFilter:
+            PrivacyFilter.AuditLogger.log_data_access(
+                user_id=1,  # 访问者ID
+                target_id=current_user_id,
+                action='view',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', ''),
+                accessed_fields=list(profile.keys())
+            )
+
+        return jsonify({
+            'success': True,
+            'data': profile
+        })
+
+    except Exception as e:
+        logger.error(f"获取个人信息错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取个人信息失败'
+        }), 500
+
+@app.route('/api/auth/profile', methods=['PUT'])
+def update_profile():
+    """更新个人信息"""
+    try:
+        data = request.get_json()
+        current_user_id = data.get('id', 1)
+
+        # 查找用户
+        user_index = -1
+        for i, u in enumerate(users):
+            if u.get('id') == current_user_id:
+                user_index = i
+                break
+
+        if user_index == -1:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        # 记录变更前的数据
+        old_data = users[user_index].copy()
+
+        # 更新用户基本信息
+        if 'real_name' in data:
+            users[user_index]['real_name'] = data['real_name']
+        if 'email' in data:
+            users[user_index]['email'] = data['email']
+        if 'phone' in data:
+            users[user_index]['phone'] = data['phone']
+
+        # 添加变更历史记录
+        change_record = {
+            'id': len(profile_history) + 1,
+            'user_id': current_user_id,
+            'timestamp': datetime.now().isoformat(),
+            'changes': [],
+            'ip_address': request.remote_addr,
+            'user_agent': request.headers.get('User-Agent', '')
+        }
+
+        # 记录具体变更
+        for key, value in data.items():
+            if key in old_data and old_data[key] != value:
+                change_record['changes'].append({
+                    'field': key,
+                    'old_value': old_data[key],
+                    'new_value': value
+                })
+
+        if change_record['changes']:
+            profile_history.append(change_record)
+
+        # 记录审计日志
+        if PrivacyFilter:
+            PrivacyFilter.AuditLogger.log_data_access(
+                user_id=current_user_id,
+                target_id=current_user_id,
+                action='update',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', ''),
+                accessed_fields=list(data.keys())
+            )
+
+        return jsonify({
+            'success': True,
+            'message': '个人信息更新成功',
+            'data': users[user_index]
+        })
+
+    except Exception as e:
+        logger.error(f"更新个人信息错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '更新个人信息失败'
+        }), 500
+
+@app.route('/api/auth/avatar', methods=['POST'])
+def upload_avatar():
+    """上传头像"""
+    try:
+        # 支持Base64和文件上传两种方式
+        if 'avatar' in request.form:
+            # Base64方式
+            import base64
+            avatar_data = request.form['avatar']
+            # 移除data:image/...;base64,前缀
+            if avatar_data.startswith('data:image'):
+                avatar_data = avatar_data.split(',')[1]
+            file_data = base64.b64decode(avatar_data)
+            filename = f"avatar_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+            current_user_id = request.form.get('user_id', 1, type=int)
+
+            if file_handler:
+                result = file_handler.save_avatar(file_data, filename, current_user_id)
+            else:
+                # 模拟返回
+                result = {
+                    'file_url': '/api/files/avatars/default.jpg',
+                    'filename': filename,
+                    'file_size': len(file_data)
+                }
+        elif 'avatar' in request.files:
+            # 文件上传方式
+            if not file_handler:
+                return jsonify({
+                    'success': False,
+                    'message': '文件上传功能不可用'
+                }), 500
+
+            file = request.files['avatar']
+            if file.filename == '':
+                return jsonify({
+                    'success': False,
+                    'message': '没有选择文件'
+                }), 400
+
+            # 读取文件数据
+            file_data = file.read()
+            file.seek(0)
+
+            # 保存文件
+            current_user_id = request.form.get('user_id', 1, type=int)
+            result = file_handler.save_avatar(file_data, file.filename, current_user_id)
+        else:
+            return jsonify({
+                'success': False,
+                'message': '请提供头像数据'
+            }), 400
+
+        # 更新用户头像URL
+        user_index = -1
+        for i, u in enumerate(users):
+            if u.get('id') == current_user_id:
+                user_index = i
+                users[user_index]['avatar_url'] = result['file_url']
+                break
+
+        # 记录审计日志
+        if PrivacyFilter:
+            PrivacyFilter.AuditLogger.log_data_access(
+                user_id=current_user_id,
+                target_id=current_user_id,
+                action='update',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', ''),
+                accessed_fields=['avatar_url']
+            )
+
+        return jsonify({
+            'success': True,
+            'message': '头像上传成功',
+            'data': result
+        })
+
+    except Exception as e:
+        logger.error(f"上传头像错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'上传头像失败: {str(e)}'
+        }), 500
+
+@app.route('/api/files/avatars/<filename>', methods=['GET'])
+def get_avatar(filename):
+    """获取头像文件"""
+    try:
+        avatar_path = os.path.join(file_handler.upload_folder, 'avatars', filename) if file_handler else None
+        if not avatar_path or not os.path.exists(avatar_path):
+            return jsonify({
+                'success': False,
+                'message': '文件不存在'
+            }), 404
+
+        return send_file(avatar_path)
+
+    except Exception as e:
+        logger.error(f"获取头像错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取文件失败'
+        }), 500
+
+@app.route('/api/auth/profile/history', methods=['GET'])
+def get_profile_history():
+    """获取个人信息变更历史"""
+    try:
+        current_user_id = request.args.get('user_id', 1, type=int)
+
+        # 获取用户的变更历史
+        user_history = [h for h in profile_history if h.get('user_id') == current_user_id]
+        user_history.sort(key=lambda x: x['timestamp'], reverse=True)
+
+        return jsonify({
+            'success': True,
+            'data': user_history
+        })
+
+    except Exception as e:
+        logger.error(f"获取变更历史错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取变更历史失败'
+        }), 500
+
+@app.route('/api/auth/profile/export', methods=['GET'])
+def export_profile():
+    """导出个人信息"""
+    try:
+        current_user_id = request.args.get('user_id', 1, type=int)
+        export_format = request.args.get('format', 'json')
+
+        # 获取个人信息
+        user = next((u for u in users if u.get('id') == current_user_id), None)
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        profile = {
+            '个人信息': {
+                '姓名': user.get('real_name', ''),
+                '用户名': user['username'],
+                '邮箱': user.get('email', ''),
+                '手机': '13800138000',
+                '性别': '男',
+                '生日': '2000-01-01'
+            },
+            '教育信息': {
+                '部门': '计算机学院',
+                '专业': '计算机科学与技术',
+                '学位': '本科',
+                '学号': 'S2021001'
+            },
+            '地址信息': {
+                '地址': '北京市海淀区中关村大街1号',
+                '城市': '北京市',
+                '省份': '北京',
+                '邮编': '100000'
+            },
+            '系统信息': {
+                '角色': user['role'],
+                '状态': user.get('status', 'active'),
+                '注册时间': user.get('created_at', ''),
+                '最后登录': datetime.now().isoformat()
+            }
+        }
+
+        if export_format == 'json':
+            return jsonify({
+                'success': True,
+                'data': profile
+            })
+        else:
+            # 这里可以添加其他格式的导出，如PDF、CSV等
+            return jsonify({
+                'success': False,
+                'message': f'不支持的导出格式: {export_format}'
+            }), 400
+
+    except Exception as e:
+        logger.error(f"导出个人信息错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '导出失败'
+        }), 500
+
+@app.route('/api/auth/change-password', methods=['POST'])
+def change_password():
+    """修改密码"""
+    try:
+        data = request.get_json()
+        current_user_id = data.get('user_id', 1)
+
+        old_password = data.get('old_password')
+        new_password = data.get('new_password')
+        confirm_password = data.get('confirm_password')
+
+        # 验证必填字段
+        if not all([old_password, new_password, confirm_password]):
+            return jsonify({
+                'success': False,
+                'message': '请填写完整的密码信息'
+            }), 400
+
+        # 验证新密码确认
+        if new_password != confirm_password:
+            return jsonify({
+                'success': False,
+                'message': '两次输入的新密码不一致'
+            }), 400
+
+        # 验证新密码强度
+        if len(new_password) < 8:
+            return jsonify({
+                'success': False,
+                'message': '新密码长度不能少于8位'
+            }), 400
+
+        # 查找用户
+        user_index = -1
+        for i, u in enumerate(users):
+            if u.get('id') == current_user_id:
+                user_index = i
+                break
+
+        if user_index == -1:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        # 验证旧密码（实际应该使用加密验证）
+        if users[user_index].get('password') != old_password:
+            return jsonify({
+                'success': False,
+                'message': '原密码不正确'
+            }), 400
+
+        # 更新密码（实际应该加密存储）
+        users[user_index]['password'] = new_password
+        users[user_index]['updated_at'] = datetime.now().isoformat()
+
+        # 记录密码变更历史
+        change_record = {
+            'id': len(profile_history) + 1,
+            'user_id': current_user_id,
+            'timestamp': datetime.now().isoformat(),
+            'changes': [{
+                'field': 'password',
+                'old_value': '******',
+                'new_value': '******'
+            }],
+            'ip_address': request.remote_addr,
+            'user_agent': request.headers.get('User-Agent', '')
+        }
+        profile_history.append(change_record)
+
+        # 记录审计日志
+        if PrivacyFilter:
+            PrivacyFilter.AuditLogger.log_data_access(
+                user_id=current_user_id,
+                target_id=current_user_id,
+                action='update',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', ''),
+                accessed_fields=['password']
+            )
+
+        return jsonify({
+            'success': True,
+            'message': '密码修改成功'
+        })
+
+    except Exception as e:
+        logger.error(f"修改密码错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '修改密码失败'
         }), 500
 
 # 用户信息路由

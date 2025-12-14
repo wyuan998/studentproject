@@ -23,7 +23,7 @@ const routes = [
       {
         path: '/profile',
         name: 'Profile',
-        component: () => import('@/views/user/Profile.vue'),
+        component: () => import('@/views/user/TestProfile.vue'),
         meta: {
           title: '个人资料'
         }

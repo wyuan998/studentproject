@@ -75,22 +75,283 @@
 
           <!-- 主内容区域 -->
           <div class="content-area">
-            <router-view />
+            <!-- 个人信息页面 -->
+            <div v-if="$route.path === '/profile'" class="profile-page">
+              <!-- 个人资料卡片 -->
+              <el-card class="profile-card">
+                <template #header>
+                  <div class="card-header">
+                    <span>个人资料</span>
+                    <el-button type="primary" @click="showEditDialog = true">
+                      编辑资料
+                    </el-button>
+                  </div>
+                </template>
+
+                <div class="profile-content">
+                  <div class="avatar-section">
+                    <el-avatar :size="120" :src="profileData.avatar_url">
+                      {{ getAvatarText() }}
+                    </el-avatar>
+                    <div class="avatar-actions">
+                      <el-button text type="primary" @click="handleAvatarUpload">
+                        更换头像
+                      </el-button>
+                    </div>
+                  </div>
+
+                  <div class="info-section">
+                    <el-descriptions :column="2" border>
+                      <el-descriptions-item label="用户名">
+                        {{ userInfo?.username }}
+                      </el-descriptions-item>
+                      <el-descriptions-item label="姓名">
+                        {{ profileData.real_name }}
+                      </el-descriptions-item>
+                      <el-descriptions-item label="邮箱">
+                        {{ profileData.email }}
+                      </el-descriptions-item>
+                      <el-descriptions-item label="手机号">
+                        {{ profileData.phone || '未设置' }}
+                      </el-descriptions-item>
+                      <el-descriptions-item label="性别">
+                        {{ getGenderLabel(profileData.gender) }}
+                      </el-descriptions-item>
+                      <el-descriptions-item label="生日">
+                        {{ profileData.birthday || '未设置' }}
+                      </el-descriptions-item>
+                      <el-descriptions-item label="部门">
+                        {{ profileData.department || '未设置' }}
+                      </el-descriptions-item>
+                      <el-descriptions-item label="专业">
+                        {{ profileData.major || '未设置' }}
+                      </el-descriptions-item>
+                      <el-descriptions-item label="学位">
+                        {{ profileData.degree || '未设置' }}
+                      </el-descriptions-item>
+                      <el-descriptions-item label="角色">
+                        <el-tag type="danger">管理员</el-tag>
+                      </el-descriptions-item>
+                      <el-descriptions-item label="地址" :span="2">
+                        {{ formatAddress() }}
+                      </el-descriptions-item>
+                    </el-descriptions>
+                  </div>
+                </div>
+              </el-card>
+
+              <!-- 安全设置卡片 -->
+              <el-card class="security-card">
+                <template #header>
+                  <span>安全设置</span>
+                </template>
+
+                <div class="security-list">
+                  <div class="security-item">
+                    <div class="security-info">
+                      <div class="security-title">登录密码</div>
+                      <div class="security-desc">保护账户安全的重要方式</div>
+                    </div>
+                    <el-button text type="primary" @click="showPasswordDialog = true">
+                      修改密码
+                    </el-button>
+                  </div>
+                </div>
+              </el-card>
+
+              <!-- 数据管理卡片 -->
+              <el-card class="data-card">
+                <template #header>
+                  <span>数据管理</span>
+                </template>
+
+                <div class="data-list">
+                  <div class="data-item">
+                    <div class="data-info">
+                      <div class="data-title">导出个人信息</div>
+                      <div class="data-desc">导出您的个人资料数据</div>
+                    </div>
+                    <el-button text type="primary" @click="handleExportProfile">
+                      导出数据
+                    </el-button>
+                  </div>
+                </div>
+              </el-card>
+            </div>
+            <!-- 其他页面 -->
+            <router-view v-else />
           </div>
         </div>
       </div>
     </template>
+
+    <!-- 编辑资料对话框 -->
+    <el-dialog
+      v-model="showEditDialog"
+      title="编辑个人资料"
+      width="600px"
+    >
+      <el-form :model="editForm" label-width="80px">
+        <el-form-item label="姓名">
+          <el-input v-model="editForm.real_name" placeholder="请输入姓名" />
+        </el-form-item>
+        <el-form-item label="邮箱">
+          <el-input v-model="editForm.email" placeholder="请输入邮箱" />
+        </el-form-item>
+        <el-form-item label="手机号">
+          <el-input v-model="editForm.phone" placeholder="请输入手机号" />
+        </el-form-item>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="性别">
+              <el-select v-model="editForm.gender" placeholder="请选择性别">
+                <el-option label="男" value="男" />
+                <el-option label="女" value="女" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="生日">
+              <el-date-picker
+                v-model="editForm.birthday"
+                type="date"
+                placeholder="选择生日"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="部门">
+          <el-input v-model="editForm.department" placeholder="请输入部门" />
+        </el-form-item>
+        <el-form-item label="专业">
+          <el-input v-model="editForm.major" placeholder="请输入专业" />
+        </el-form-item>
+        <el-form-item label="学位">
+          <el-select v-model="editForm.degree" placeholder="请选择学位">
+            <el-option label="本科" value="本科" />
+            <el-option label="硕士" value="硕士" />
+            <el-option label="博士" value="博士" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="地址">
+          <el-input v-model="editForm.address" placeholder="请输入详细地址" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showEditDialog = false">取消</el-button>
+          <el-button type="primary" @click="handleUpdateProfile">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 修改密码对话框 -->
+    <el-dialog
+      v-model="showPasswordDialog"
+      title="修改密码"
+      width="450px"
+    >
+      <el-form :model="passwordForm" label-width="100px">
+        <el-form-item label="当前密码">
+          <el-input v-model="passwordForm.old_password" type="password" placeholder="请输入当前密码" />
+        </el-form-item>
+        <el-form-item label="新密码">
+          <el-input v-model="passwordForm.new_password" type="password" placeholder="请输入新密码" />
+        </el-form-item>
+        <el-form-item label="确认密码">
+          <el-input v-model="passwordForm.confirm_password" type="password" placeholder="请再次输入新密码" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showPasswordDialog = false">取消</el-button>
+          <el-button type="primary" @click="handleChangePassword">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 头像上传对话框 -->
+    <el-dialog
+      v-model="showAvatarDialog"
+      title="更换头像"
+      width="400px"
+    >
+      <div class="avatar-upload-content">
+        <div class="avatar-preview">
+          <el-avatar :size="150" :src="avatarPreview" />
+        </div>
+        <div class="avatar-upload-actions">
+          <input
+            ref="avatarInput"
+            type="file"
+            accept="image/*"
+            style="display: none"
+            @change="handleFileChange"
+          />
+          <el-button @click="triggerFileInput">选择图片</el-button>
+          <el-button type="primary" @click="handleUploadAvatar">确认上传</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const route = useRoute()
 const userInfo = ref<any>(null)
+
+// 个人信息相关状态
+const showEditDialog = ref(false)
+const showPasswordDialog = ref(false)
+const showAvatarDialog = ref(false)
+const avatarInput = ref<HTMLInputElement>()
+const avatarPreview = ref('')
+const avatarFile = ref<File | null>(null)
+
+const profileData = ref({
+  real_name: '系统管理员',
+  email: 'admin@example.com',
+  phone: '13800138000',
+  gender: '男',
+  birthday: '2000-01-01',
+  address: '北京市海淀区中关村大街1号',
+  city: '北京市',
+  province: '北京',
+  postal_code: '100000',
+  department: '计算机学院',
+  major: '计算机科学与技术',
+  degree: '本科',
+  avatar_url: ''
+})
+
+const editForm = ref({
+  real_name: '',
+  email: '',
+  phone: '',
+  gender: '',
+  birthday: '',
+  address: '',
+  city: '',
+  province: '',
+  postal_code: '',
+  department: '',
+  major: '',
+  degree: ''
+})
+
+const passwordForm = ref({
+  old_password: '',
+  new_password: '',
+  confirm_password: ''
+})
 
 // 当前路由的元信息
 const currentRouteMeta = computed(() => route.meta)
@@ -202,10 +463,10 @@ const handleMenuSelect = (index: string) => {
 const handleUserCommand = async (command: string) => {
   switch (command) {
     case 'profile':
-      ElMessage.info('个人信息功能开发中')
+      router.push('/profile')
       break
     case 'settings':
-      ElMessage.info('系统设置功能开发中')
+      router.push('/system-settings')
       break
     case 'logout':
       try {
@@ -303,6 +564,158 @@ const getScoreColor = (score, maxScore) => {
 const getPercentage = (score, maxScore) => {
   return ((score / maxScore) * 100).toFixed(1)
 }
+
+// 个人信息相关方法
+const getAvatarText = () => {
+  return (userInfo.value?.username || 'U').charAt(0).toUpperCase()
+}
+
+const getGenderLabel = (gender: string) => {
+  return gender || '未设置'
+}
+
+const formatAddress = () => {
+  const addr = profileData.value.address
+  const city = profileData.value.city
+  const province = profileData.value.province
+
+  const parts = [addr, city, province].filter(Boolean)
+  return parts.length > 0 ? parts.join(', ') : '未设置'
+}
+
+const handleUpdateProfile = () => {
+  // 模拟更新
+  Object.assign(profileData.value, editForm.value)
+  showEditDialog.value = false
+  ElMessage.success('个人信息更新成功')
+}
+
+const handleChangePassword = () => {
+  if (!passwordForm.value.old_password || !passwordForm.value.new_password) {
+    ElMessage.warning('请填写完整的密码信息')
+    return
+  }
+
+  if (passwordForm.value.new_password !== passwordForm.value.confirm_password) {
+    ElMessage.error('两次输入的新密码不一致')
+    return
+  }
+
+  if (passwordForm.value.new_password.length < 8) {
+    ElMessage.error('新密码长度不能少于8位')
+    return
+  }
+
+  // 模拟修改密码
+  showPasswordDialog.value = false
+  ElMessage.success('密码修改成功')
+
+  // 重置表单
+  passwordForm.value = {
+    old_password: '',
+    new_password: '',
+    confirm_password: ''
+  }
+}
+
+const handleAvatarUpload = () => {
+  showAvatarDialog.value = true
+  avatarPreview.value = ''
+  avatarFile.value = null
+}
+
+const triggerFileInput = () => {
+  avatarInput.value?.click()
+}
+
+const handleFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+
+  if (file) {
+    // 检查文件大小（2MB）
+    if (file.size > 2 * 1024 * 1024) {
+      ElMessage.error('图片大小不能超过2MB')
+      return
+    }
+
+    // 检查文件类型
+    if (!file.type.startsWith('image/')) {
+      ElMessage.error('请选择图片文件')
+      return
+    }
+
+    avatarFile.value = file
+
+    // 生成预览
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      avatarPreview.value = e.target?.result as string
+    }
+    reader.readAsDataURL(file)
+  }
+}
+
+const handleUploadAvatar = () => {
+  if (!avatarFile.value) {
+    ElMessage.warning('请先选择图片')
+    return
+  }
+
+  // 模拟上传
+  profileData.value.avatar_url = avatarPreview.value
+  showAvatarDialog.value = false
+  ElMessage.success('头像上传成功')
+}
+
+const handleExportProfile = () => {
+  const exportData = {
+    个人信息: {
+      姓名: profileData.value.real_name,
+      用户名: userInfo.value?.username,
+      邮箱: profileData.value.email,
+      手机: profileData.value.phone,
+      性别: profileData.value.gender,
+      生日: profileData.value.birthday
+    },
+    教育信息: {
+      部门: profileData.value.department,
+      专业: profileData.value.major,
+      学位: profileData.value.degree
+    },
+    地址信息: {
+      地址: profileData.value.address,
+      城市: profileData.value.city,
+      省份: profileData.value.province,
+      邮编: profileData.value.postal_code
+    }
+  }
+
+  // 创建下载链接
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+    type: 'application/json'
+  })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `个人资料_${new Date().toISOString().split('T')[0]}.json`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+
+  ElMessage.success('个人资料导出成功')
+}
+
+// 监听编辑对话框打开
+const watchEditDialog = (show: boolean) => {
+  if (show) {
+    // 加载当前数据到编辑表单
+    Object.assign(editForm.value, profileData.value)
+  }
+}
+
+watch(showEditDialog, watchEditDialog)
 
 onMounted(() => {
   // 获取用户信息
@@ -443,6 +856,127 @@ onMounted(() => {
 
   .content-area {
     padding: 12px;
+  }
+}
+
+/* 个人信息页面样式 */
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.profile-card,
+.security-card,
+.data-card {
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+  }
+}
+
+.profile-content {
+  display: flex;
+  gap: 40px;
+
+  .avatar-section {
+    text-align: center;
+
+    .avatar-actions {
+      margin-top: 16px;
+    }
+  }
+
+  .info-section {
+    flex: 1;
+  }
+}
+
+.security-list {
+  .security-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    .security-info {
+      .security-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+        margin-bottom: 4px;
+      }
+
+      .security-desc {
+        font-size: 14px;
+        color: var(--el-text-color-regular);
+      }
+    }
+  }
+}
+
+.data-list {
+  .data-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    .data-info {
+      .data-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+        margin-bottom: 4px;
+      }
+
+      .data-desc {
+        font-size: 14px;
+        color: var(--el-text-color-regular);
+      }
+    }
+  }
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.avatar-upload-content {
+  text-align: center;
+
+  .avatar-preview {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .avatar-upload-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .profile-content {
+    flex-direction: column;
+    gap: 20px;
   }
 }
 </style>

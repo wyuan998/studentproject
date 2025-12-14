@@ -127,5 +127,13 @@ export const authApi = {
 
   // 删除头像
   deleteAvatar: () =>
-    request.delete('/auth/avatar')
+    request.delete('/auth/avatar'),
+
+  // 导出个人信息
+  exportProfile: (format: string = 'json') =>
+    request.get('/auth/profile/export', { params: { format } }),
+
+  // 获取个人信息变更历史
+  getProfileHistory: () =>
+    request.get('/auth/profile/history')
 }
