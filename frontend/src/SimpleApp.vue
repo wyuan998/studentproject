@@ -51,41 +51,25 @@
                 <span>仪表板</span>
               </el-menu-item>
 
-              <el-sub-menu index="1">
-                <template #title>
-                  <el-icon><User /></el-icon>
-                  <span>学生管理</span>
-                </template>
-                <el-menu-item index="/students">学生列表</el-menu-item>
-                <el-menu-item index="/students/create">添加学生</el-menu-item>
-              </el-sub-menu>
+              <el-menu-item index="/students">
+                <el-icon><User /></el-icon>
+                <span>学生管理</span>
+              </el-menu-item>
 
-              <el-sub-menu index="2">
-                <template #title>
-                  <el-icon><Avatar /></el-icon>
-                  <span>教师管理</span>
-                </template>
-                <el-menu-item index="/teachers">教师列表</el-menu-item>
-                <el-menu-item index="/teachers/create">添加教师</el-menu-item>
-              </el-sub-menu>
+              <el-menu-item index="/teachers">
+                <el-icon><Avatar /></el-icon>
+                <span>教师管理</span>
+              </el-menu-item>
 
-              <el-sub-menu index="3">
-                <template #title>
-                  <el-icon><Reading /></el-icon>
-                  <span>课程管理</span>
-                </template>
-                <el-menu-item index="/courses">课程列表</el-menu-item>
-                <el-menu-item index="/courses/create">添加课程</el-menu-item>
-              </el-sub-menu>
+              <el-menu-item index="/courses">
+                <el-icon><Reading /></el-icon>
+                <span>课程管理</span>
+              </el-menu-item>
 
-              <el-sub-menu index="4">
-                <template #title>
-                  <el-icon><DocumentChecked /></el-icon>
-                  <span>成绩管理</span>
-                </template>
-                <el-menu-item index="/grades">成绩列表</el-menu-item>
-                <el-menu-item index="/grades/entry">成绩录入</el-menu-item>
-              </el-sub-menu>
+              <el-menu-item index="/grades">
+                <el-icon><DocumentChecked /></el-icon>
+                <span>成绩管理</span>
+              </el-menu-item>
             </el-menu>
           </div>
 
