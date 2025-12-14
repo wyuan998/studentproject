@@ -22,7 +22,7 @@ export interface ResponseData<T = any> {
 
 // 创建axios实例
 const service = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
