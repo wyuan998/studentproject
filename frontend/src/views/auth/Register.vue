@@ -362,7 +362,8 @@ const handleRegister = async () => {
       phone: registerForm.phone,
       real_name: registerForm.real_name,
       student_id: registerForm.student_id,
-      captcha: registerForm.captcha
+      captcha: registerForm.captcha,
+      captcha_id: captchaData.value?.captcha_id || ''
     })
 
     if (success) {

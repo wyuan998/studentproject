@@ -16,6 +16,7 @@ export interface RegisterFormData {
   real_name?: string
   student_id?: string
   captcha?: string
+  captcha_id?: string
 }
 
 export interface UserInfo {

@@ -7,6 +7,11 @@ const routes = [
     component: () => import('@/views/auth/SimpleLogin.vue')
   },
   {
+    path: '/register',
+    name: 'Register',
+    component: () => import('@/views/auth/Register.vue')
+  },
+  {
     path: '/',
     component: () => import('@/SimpleApp.vue'),
     children: [

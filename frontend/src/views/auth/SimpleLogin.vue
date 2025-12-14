@@ -38,6 +38,11 @@
         </el-form-item>
       </el-form>
 
+      <div class="register-link">
+        还没有账号？
+        <router-link to="/register" class="link">立即注册</router-link>
+      </div>
+
       <div class="demo-info">
         <p>演示账号:</p>
         <p>用户名: admin</p>
@@ -153,6 +158,23 @@ h2 {
   color: #909399;
   margin-bottom: 30px;
   font-size: 14px;
+}
+
+.register-link {
+  text-align: center;
+  margin-top: 20px;
+  color: #606266;
+  font-size: 14px;
+}
+
+.register-link .link {
+  color: #409eff;
+  text-decoration: none;
+  margin-left: 5px;
+}
+
+.register-link .link:hover {
+  text-decoration: underline;
 }
 
 .demo-info {

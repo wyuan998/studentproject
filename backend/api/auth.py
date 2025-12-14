@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 import uuid
 
 from models import User, UserRole, AuditLog, AuditAction
-from schemas import UserSchema, UserLoginSchema, UserPasswordChangeSchema, UserPasswordResetSchema
+from schemas import UserSchema, UserLoginSchema, UserPasswordChangeSchema, UserPasswordResetSchema, UserRegisterSchema
 from extensions import db, redis_client
 from utils.auth import (
     verify_password, generate_password_hash,
@@ -21,6 +21,8 @@ from utils.auth import (
 )
 from utils.responses import success_response, error_response, validation_error_response
 from utils.decorators import rate_limit
+from utils.captcha import generate_captcha_image, verify_captcha
+from marshmallow import ValidationError
 
 # 创建命名空间
 auth_ns = Namespace('auth', description='用户认证相关操作')
@@ -30,6 +32,21 @@ login_model = auth_ns.model('Login', {
     'username': fields.String(required=True, description='用户名'),
     'password': fields.String(required=True, description='密码'),
     'remember_me': fields.Boolean(default=False, description='记住我')
+})
+
+register_model = auth_ns.model('Register', {
+    'username': fields.String(required=True, description='用户名'),
+    'email': fields.String(required=True, description='邮箱地址'),
+    'password': fields.String(required=True, description='密码'),
+    'confirm_password': fields.String(required=True, description='确认密码'),
+    'phone': fields.String(required=True, description='手机号'),
+    'real_name': fields.String(required=True, description='真实姓名'),
+    'student_id': fields.String(required=True, description='学生号'),
+    'captcha': fields.String(required=True, description='验证码')
+})
+
+check_field_model = auth_ns.model('CheckField', {
+    'value': fields.String(required=True, description='值')
 })
 
 password_change_model = auth_ns.model('PasswordChange', {
@@ -403,6 +420,151 @@ class CheckTokenResource(Resource):
                 'username': user.username,
                 'role': user.role.value
             })
+
+        except Exception as e:
+            return error_response(str(e), 500)
+
+@auth_ns.route('/register')
+class RegisterResource(Resource):
+    @auth_ns.expect(register_model)
+    @auth_ns.doc('user_register')
+    @rate_limit("3/minute")  # 限流：每分钟3次
+    def post(self):
+        """用户注册"""
+        try:
+            # 验证数据
+            schema = UserRegisterSchema()
+            data = schema.load(request.json)
+
+            # 验证验证码
+            captcha_id = request.json.get('captcha_id')
+            if not captcha_id or not verify_captcha(captcha_id, data['captcha'], redis_client):
+                return error_response("验证码错误", 400)
+
+            # 检查注册限制
+            registration_key = f"registration:{request.remote_addr}"
+            registration_count = redis_client.get(registration_key)
+            if registration_count and int(registration_count) >= 3:
+                return error_response("注册次数过多，请稍后再试", 429)
+
+            # 创建用户
+            user = User(
+                username=data['username'],
+                email=data['email'],
+                password_hash=generate_password_hash(data['password']),
+                role=UserRole.STUDENT  # 默认注册为学生角色
+            )
+
+            # 创建用户资料
+            from models import UserProfile
+            user_profile = UserProfile(
+                user=user,
+                first_name=data['real_name'],
+                last_name="",  # 暂时为空，可以后续完善
+                phone=data['phone']
+            )
+
+            # 如果是学生角色，创建学生记录
+            from models import Student
+            student = Student(
+                user=user,
+                student_id=data['student_id'],
+                first_name=data['real_name'],
+                last_name=""
+            )
+
+            # 保存到数据库
+            db.session.add(user)
+            db.session.add(user_profile)
+            db.session.add(student)
+            db.session.commit()
+
+            # 记录注册日志
+            AuditLog.log_action(
+                action=AuditAction.USER_CREATED,
+                user_id=user.id,
+                description="用户注册"
+            )
+
+            # 更新注册计数
+            redis_client.setex(registration_key, 3600, (int(registration_count or 0) + 1))
+
+            # 删除已使用的验证码
+            redis_client.delete(f"captcha:{captcha_id}")
+
+            return success_response("注册成功", {
+                'user_id': user.id,
+                'username': user.username,
+                'email': user.email
+            })
+
+        except ValidationError as e:
+            return validation_error_response(e.messages)
+        except Exception as e:
+            db.session.rollback()
+            return error_response(str(e), 500)
+
+@auth_ns.route('/captcha')
+class CaptchaResource(Resource):
+    @auth_ns.doc('get_captcha')
+    def get(self):
+        """获取验证码"""
+        try:
+            # 生成验证码
+            captcha_data = generate_captcha_image()
+
+            # 存储验证码到Redis（5分钟有效）
+            captcha_id = store_captcha(captcha_data, redis_client, expire_time=300)
+
+            return success_response("验证码生成成功", {
+                'captcha_id': captcha_id,
+                'captcha_image': captcha_data['captcha_image']
+            })
+
+        except Exception as e:
+            return error_response(str(e), 500)
+
+@auth_ns.route('/check-username')
+class CheckUsernameResource(Resource):
+    @auth_ns.expect(check_field_model)
+    @auth_ns.doc('check_username')
+    def post(self):
+        """检查用户名是否可用"""
+        try:
+            data = request.json
+            username = data.get('value', '').strip()
+
+            if not username:
+                return error_response("用户名不能为空", 400)
+
+            if len(username) < 3:
+                return error_response("用户名长度至少为3位", 400)
+
+            if User.query.filter_by(username=username).first():
+                return error_response("用户名已存在", 409)
+
+            return success_response("用户名可用")
+
+        except Exception as e:
+            return error_response(str(e), 500)
+
+@auth_ns.route('/check-email')
+class CheckEmailResource(Resource):
+    @auth_ns.expect(check_field_model)
+    @auth_ns.doc('check_email')
+    def post(self):
+        """检查邮箱是否可用"""
+        try:
+            data = request.json
+            email = data.get('value', '').strip()
+
+            if not email:
+                return error_response("邮箱不能为空", 400)
+
+            if User.query.filter_by(email=email).first():
+                return error_response("邮箱已被注册", 409)
+
+            return success_response("邮箱可用")
 
         except Exception as e:
             return error_response(str(e), 500)
