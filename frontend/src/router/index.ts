@@ -42,6 +42,22 @@ const routes = [
         meta: {
           title: '成绩管理'
         }
+      },
+      {
+        path: '/data-management',
+        name: 'DataManagement',
+        component: () => import('@/views/admin/DataManagement.vue'),
+        meta: {
+          title: '数据管理'
+        }
+      },
+      {
+        path: '/notifications',
+        name: 'MessageCenter',
+        component: () => import('@/views/admin/MessageCenter.vue'),
+        meta: {
+          title: '消息中心'
+        }
       }
     ]
   },
