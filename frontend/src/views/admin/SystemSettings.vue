@@ -336,10 +336,11 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Setting, Lock, Message, FolderOpened, Download, Bell
 } from '@element-plus/icons-vue'
+import { systemConfigApi } from '@/api/system-config'
 
 const router = useRouter()
 const activeMenu = ref('basic')
@@ -413,11 +414,23 @@ const handleMenuSelect = (key: string) => {
 
 const handleSaveBasic = async () => {
   try {
-    // Mock API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const configUpdates = [
+      { key: 'system.name', value: basicForm.systemName },
+      { key: 'system.description', value: basicForm.systemDescription },
+      { key: 'system.maintenance_mode', value: basicForm.maintenanceMode },
+      { key: 'system.maintenance_message', value: basicForm.maintenanceMessage },
+      { key: 'system.timezone', value: basicForm.timezone },
+      { key: 'system.language', value: basicForm.language }
+    ]
+
+    await systemConfigApi.batchUpdateConfigs({
+      configs: configUpdates,
+      category: 'basic'
+    })
     ElMessage.success('基本设置保存成功')
-  } catch (error) {
-    ElMessage.error('保存失败')
+  } catch (error: any) {
+    console.error('保存基本设置失败:', error)
+    ElMessage.error(error.response?.data?.message || '保存失败')
   }
 }
 
@@ -435,11 +448,25 @@ const handleResetBasic = () => {
 
 const handleSaveSecurity = async () => {
   try {
-    // Mock API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const configUpdates = [
+      { key: 'security.password_policy', value: securityForm.passwordPolicy },
+      { key: 'security.password_expiry', value: securityForm.passwordExpiry },
+      { key: 'security.login_lockout', value: securityForm.loginLockout },
+      { key: 'security.lockout_threshold', value: securityForm.lockoutThreshold },
+      { key: 'security.lockout_duration', value: securityForm.lockoutDuration },
+      { key: 'security.session_timeout', value: securityForm.sessionTimeout },
+      { key: 'security.force_https', value: securityForm.forceHttps },
+      { key: 'security.ip_whitelist', value: securityForm.ipWhitelist }
+    ]
+
+    await systemConfigApi.batchUpdateConfigs({
+      configs: configUpdates,
+      category: 'security'
+    })
     ElMessage.success('安全设置保存成功')
-  } catch (error) {
-    ElMessage.error('保存失败')
+  } catch (error: any) {
+    console.error('保存安全设置失败:', error)
+    ElMessage.error(error.response?.data?.message || '保存失败')
   }
 }
 
@@ -458,11 +485,24 @@ const handleResetSecurity = () => {
 
 const handleSaveEmail = async () => {
   try {
-    // Mock API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const configUpdates = [
+      { key: 'email.smtp_host', value: emailForm.smtpHost },
+      { key: 'email.smtp_port', value: emailForm.smtpPort },
+      { key: 'email.encryption', value: emailForm.encryption },
+      { key: 'email.from_email', value: emailForm.fromEmail },
+      { key: 'email.from_name', value: emailForm.fromName },
+      { key: 'email.username', value: emailForm.username },
+      { key: 'email.password', value: emailForm.password }
+    ]
+
+    await systemConfigApi.batchUpdateConfigs({
+      configs: configUpdates,
+      category: 'email'
+    })
     ElMessage.success('邮件设置保存成功')
-  } catch (error) {
-    ElMessage.error('保存失败')
+  } catch (error: any) {
+    console.error('保存邮件设置失败:', error)
+    ElMessage.error(error.response?.data?.message || '保存失败')
   }
 }
 
@@ -574,8 +614,55 @@ const handleBack = () => {
   router.back()
 }
 
+const loadSystemConfigs = async () => {
+  try {
+    const response = await systemConfigApi.getConfigList({
+      per_page: 100 // 获取所有配置
+    })
+
+    if (response.success) {
+      const configs = response.data.configs
+      const configDict = configs.reduce((acc, config) => {
+        acc[config.key] = config.value
+        return acc
+      }, {} as Record<string, any>)
+
+      // 填充基本设置表单
+      basicForm.systemName = configDict['system.name'] || '学生信息管理系统'
+      basicForm.systemDescription = configDict['system.description'] || '一个功能完善的学生信息管理平台'
+      basicForm.systemVersion = '1.0.0' // 版本号通常是硬编码的
+      basicForm.maintenanceMode = configDict['system.maintenance_mode'] || false
+      basicForm.maintenanceMessage = configDict['system.maintenance_message'] || '系统正在维护中，请稍后访问'
+      basicForm.timezone = configDict['system.timezone'] || 'Asia/Shanghai'
+      basicForm.language = configDict['system.language'] || 'zh-CN'
+
+      // 填充安全设置表单
+      securityForm.passwordPolicy = configDict['security.password_policy'] || ['length', 'number']
+      securityForm.passwordExpiry = configDict['security.password_expiry'] || 90
+      securityForm.loginLockout = configDict['security.login_lockout'] || true
+      securityForm.lockoutThreshold = configDict['security.lockout_threshold'] || 5
+      securityForm.lockoutDuration = configDict['security.lockout_duration'] || 30
+      securityForm.sessionTimeout = configDict['security.session_timeout'] || 120
+      securityForm.forceHttps = configDict['security.force_https'] || false
+      securityForm.ipWhitelist = configDict['security.ip_whitelist'] || ''
+
+      // 填充邮件设置表单
+      emailForm.smtpHost = configDict['email.smtp_host'] || ''
+      emailForm.smtpPort = configDict['email.smtp_port'] || 587
+      emailForm.encryption = configDict['email.encryption'] || 'tls'
+      emailForm.fromEmail = configDict['email.from_email'] || ''
+      emailForm.fromName = configDict['email.from_name'] || '系统通知'
+      emailForm.username = configDict['email.username'] || ''
+      emailForm.password = configDict['email.password'] || ''
+    }
+  } catch (error: any) {
+    console.error('加载系统配置失败:', error)
+    // 不显示错误消息，因为可能是首次访问，配置为空
+  }
+}
+
 onMounted(() => {
-  // 加载现有设置
+  loadSystemConfigs()
 })
 </script>
 
