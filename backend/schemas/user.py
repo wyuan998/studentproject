@@ -273,6 +273,72 @@ class UserPasswordResetSchema(Schema):
 
     email = fields.Email(required=True)
 
+class UserRegisterSchema(Schema):
+    """用户注册模式"""
+
+    # 基本信息
+    username = fields.Str(
+        required=True,
+        validate=validate.Regexp(r'^[a-zA-Z0-9_]{3,20}$', error="用户名必须是3-20位字母、数字或下划线")
+    )
+    email = fields.Email(
+        required=True,
+        validate=validate.Length(max=100)
+    )
+    password = fields.Str(
+        required=True,
+        validate=validate.And(
+            validate.Length(min=6, max=128, error="密码长度必须在6-128位之间"),
+            validate.Regexp(r'^(?=.*[a-z])(?=.*\d)', error="密码必须包含字母和数字")
+        ),
+        load_only=True
+    )
+    confirm_password = fields.Str(
+        required=True,
+        load_only=True
+    )
+    phone = fields.Str(
+        required=True,
+        validate=validate.Regexp(r'^1[3-9]\d{9}$', error="请输入有效的手机号码")
+    )
+    real_name = fields.Str(
+        required=True,
+        validate=validate.And(
+            validate.Length(min=2, max=10, error="姓名长度为2-10位"),
+            validate.Regexp(r'^[\u4e00-\u9fa5]+$', error="姓名必须为中文")
+        )
+    )
+    student_id = fields.Str(
+        required=True,
+        validate=validate.Regexp(r'^\d{10,12}$', error="学生号应为10-12位数字")
+    )
+    captcha = fields.Str(
+        required=True,
+        validate=validate.Length(min=4, max=4, error="验证码长度为4位"),
+        load_only=True
+    )
+
+    @validates('username')
+    def validate_username(self, value):
+        """验证用户名唯一性"""
+        if User.query.filter_by(username=value).first():
+            raise ValidationError("用户名已存在")
+
+    @validates('email')
+    def validate_email(self, value):
+        """验证邮箱唯一性"""
+        if User.query.filter_by(email=value).first():
+            raise ValidationError("邮箱已被注册")
+
+    @validates_schema
+    def validate_passwords(self, data, **kwargs):
+        """验证密码确认"""
+        password = data.get('password')
+        confirm_password = data.get('confirm_password')
+
+        if password != confirm_password:
+            raise ValidationError("密码确认不匹配", field_name='confirm_password')
+
 class UserProfileSimpleSchema(BaseSchema):
     """简单用户资料模式（用于嵌套显示）"""
 

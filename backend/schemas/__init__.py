@@ -12,7 +12,7 @@ from models import (
 )
 
 # 导入所有序列化模式
-from schemas.user import UserSchema, UserProfileSchema, UserCreateSchema, UserUpdateSchema
+from schemas.user import UserSchema, UserProfileSchema, UserCreateSchema, UserUpdateSchema, UserRegisterSchema
 from schemas.student import StudentSchema, StudentCreateSchema, StudentUpdateSchema
 from schemas.teacher import TeacherSchema, TeacherCreateSchema, TeacherUpdateSchema
 from schemas.admin import AdminSchema, AdminCreateSchema, AdminUpdateSchema
@@ -42,6 +42,7 @@ __all__ = [
     'UserProfileSchema',
     'UserCreateSchema',
     'UserUpdateSchema',
+    'UserRegisterSchema',
 
     # 学生相关
     'StudentSchema',
