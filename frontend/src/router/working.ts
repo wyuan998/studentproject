@@ -12,6 +12,14 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/register',
+    component: () => import('../views/auth/Register.vue'),
+    meta: {
+      title: '注册',
+      showLayout: false
+    }
+  },
+  {
     path: '/',
     component: SimpleApp,
     redirect: '/dashboard'
@@ -108,7 +116,7 @@ router.beforeEach((to, from, next) => {
     document.title = `${to.meta.title} - 学生信息管理系统`
   }
 
-  if (to.path === '/login') {
+  if (to.path === '/login' || to.path === '/register') {
     if (token) {
       next('/dashboard')
     } else {
