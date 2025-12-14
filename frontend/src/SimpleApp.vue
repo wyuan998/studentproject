@@ -111,10 +111,106 @@ const userInfo = ref<any>(null)
 // 当前路由的元信息
 const currentRouteMeta = computed(() => route.meta)
 
+// 成绩数据
+const gradesData = ref([
+  {
+    id: 1,
+    student_name: '张三',
+    student_no: 'S2021001',
+    course_name: '计算机科学导论',
+    exam_type: '期中考试',
+    score: 85,
+    max_score: 100,
+    is_published: true
+  },
+  {
+    id: 2,
+    student_name: '张三',
+    student_no: 'S2021001',
+    course_name: '计算机科学导论',
+    exam_type: '期末考试',
+    score: 88,
+    max_score: 100,
+    is_published: true
+  },
+  {
+    id: 3,
+    student_name: '李四',
+    student_no: 'S2021002',
+    course_name: '计算机科学导论',
+    exam_type: '期中考试',
+    score: 92,
+    max_score: 100,
+    is_published: true
+  },
+  {
+    id: 4,
+    student_name: '李四',
+    student_no: 'S2021002',
+    course_name: '软件工程',
+    exam_type: '作业',
+    score: 95,
+    max_score: 100,
+    is_published: true
+  },
+  {
+    id: 5,
+    student_name: '王五',
+    student_no: 'S2021003',
+    course_name: '软件工程',
+    exam_type: '测验',
+    score: 76,
+    max_score: 100,
+    is_published: false
+  },
+  {
+    id: 6,
+    student_name: '王五',
+    student_no: 'S2021003',
+    course_name: '数据结构与算法',
+    exam_type: '项目',
+    score: 82,
+    max_score: 100,
+    is_published: true
+  }
+])
+
+// 响应式数据
+const gradeSearchQuery = ref('')
+const selectedGrades = ref([])
+
+// 计算属性
+const showGradesList = computed(() => route.path === '/grades/list')
+
+const filteredGrades = computed(() => {
+  if (!gradeSearchQuery.value) return gradesData.value
+  const query = gradeSearchQuery.value.toLowerCase()
+  return gradesData.value.filter(grade =>
+    grade.student_name.toLowerCase().includes(query) ||
+    grade.student_no.toLowerCase().includes(query) ||
+    grade.course_name.toLowerCase().includes(query) ||
+    grade.exam_type.toLowerCase().includes(query)
+  )
+})
+
+const publishedCount = computed(() => gradesData.value.filter(g => g.is_published).length)
+const unpublishedCount = computed(() => gradesData.value.filter(g => !g.is_published).length)
+const averageScore = computed(() => {
+  const total = gradesData.value.reduce((sum, g) => sum + g.score, 0)
+  return (total / gradesData.value.length).toFixed(1)
+})
+
 // 处理菜单选择
 const handleMenuSelect = (index: string) => {
+  console.log('菜单点击:', index)
+  console.log('当前路径:', route.path)
+
+  
   if (index !== route.path) {
+    console.log('跳转到:', index)
     router.push(index)
+  } else {
+    console.log('路径相同，不跳转')
   }
 }
 
@@ -147,6 +243,81 @@ const logout = () => {
   localStorage.removeItem('user')
   ElMessage.success('已退出登录')
   router.push('/login')
+}
+
+const goToDashboard = () => {
+  router.push('/dashboard')
+}
+
+// 成绩管理相关方法
+const handleGradeSearch = () => {
+  console.log('搜索成绩:', gradeSearchQuery.value)
+}
+
+const handleAddGrade = () => {
+  ElMessage.info('录入成绩功能开发中')
+}
+
+const handleImportGrades = () => {
+  ElMessage.info('批量导入功能开发中')
+}
+
+const handleExportGrades = () => {
+  ElMessage.info('导出数据功能开发中')
+}
+
+const handleBatchDelete = () => {
+  ElMessage.info('批量删除功能开发中')
+}
+
+const handleGradeSelectionChange = (selection) => {
+  selectedGrades.value = selection
+}
+
+const handleViewGrade = (row) => {
+  ElMessage.info('查看成绩详情功能开发中')
+}
+
+const handleEditGrade = (row) => {
+  ElMessage.info('编辑成绩功能开发中')
+}
+
+const handlePublishGrade = (row) => {
+  row.is_published = true
+  ElMessage.success('成绩已发布')
+}
+
+const handleDeleteGrade = (row) => {
+  ElMessage.info('删除成绩功能开发中')
+}
+
+// 工具函数
+const getExamTypeTag = (type) => {
+  const typeMap = {
+    '期中考试': 'warning',
+    '期末考试': 'danger',
+    '作业': 'primary',
+    '测验': 'info',
+    '项目': 'success'
+  }
+  return typeMap[type] || 'info'
+}
+
+const getExamTypeText = (type) => {
+  return type
+}
+
+const getScoreColor = (score, maxScore) => {
+  const percentage = (score / maxScore) * 100
+  if (percentage >= 90) return '#67C23A'
+  if (percentage >= 80) return '#409EFF'
+  if (percentage >= 70) return '#E6A23C'
+  if (percentage >= 60) return '#F56C6C'
+  return '#F56C6C'
+}
+
+const getPercentage = (score, maxScore) => {
+  return ((score / maxScore) * 100).toFixed(1)
 }
 
 onMounted(() => {
@@ -289,5 +460,117 @@ onMounted(() => {
   .content-area {
     padding: 12px;
   }
+}
+</style>
+
+<style scoped>
+/* 成绩管理样式 */
+.grade-management {
+  padding: 0;
+}
+
+.page-header {
+  margin-bottom: 20px;
+  padding: 20px 0;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.header-content h2 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.page-description {
+  margin: 0;
+  font-size: 14px;
+  color: #909399;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.table-card {
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.stats-cards {
+  margin-top: 20px;
+}
+
+.stat-card {
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.15);
+}
+
+.stat-content {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16px;
+  font-size: 20px;
+  color: #fff;
+}
+
+.stat-icon.total {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.stat-icon.published {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.stat-icon.unpublished {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.stat-icon.average {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  color: #666;
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #909399;
 }
 </style>

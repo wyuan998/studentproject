@@ -16,10 +16,10 @@ app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # 确保中文字符正确编码
 app.config['JSON_SORT_KEYS'] = False
 
-# 配置CORS - 支持localhost:3002并允许所有必要的方法和头
+# 配置CORS - 支持localhost:3000, 3001, 3002并允许所有必要的方法和头
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],
+        "origins": ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
         "supports_credentials": True

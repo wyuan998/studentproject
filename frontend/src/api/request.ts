@@ -1,13 +1,14 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios'
+import axios from 'axios'
 import { ElMessage, ElLoading } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import router from '@/router'
 
 // 请求配置接口
-export interface RequestConfig extends AxiosRequestConfig {
+export interface RequestConfig {
   loading?: boolean
   skipErrorHandler?: boolean
   skipAuth?: boolean
+  [key: string]: any
 }
 
 // 响应数据接口
@@ -20,7 +21,7 @@ export interface ResponseData<T = any> {
 }
 
 // 创建axios实例
-const service: AxiosInstance = axios.create({
+const service = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 30000,
   headers: {
@@ -57,7 +58,7 @@ const hideLoading = () => {
 
 // 请求拦截器
 service.interceptors.request.use(
-  (config: RequestConfig) => {
+  (config) => {
     // 显示loading
     if (config.loading !== false) {
       showLoading()
@@ -82,7 +83,7 @@ service.interceptors.request.use(
 
     return config
   },
-  (error: AxiosError) => {
+  (error) => {
     hideLoading()
     return Promise.reject(error)
   }
@@ -90,9 +91,9 @@ service.interceptors.request.use(
 
 // 响应拦截器
 service.interceptors.response.use(
-  (response: AxiosResponse<ResponseData>) => {
+  (response) => {
     // 隐藏loading
-    const config = response.config as RequestConfig
+    const config = response.config
     if (config.loading !== false) {
       hideLoading()
     }
@@ -127,9 +128,9 @@ service.interceptors.response.use(
 
     return response
   },
-  async (error: AxiosError) => {
+  async (error) => {
     // 隐藏loading
-    const config = error.config as RequestConfig
+    const config = error.config
     if (config?.loading !== false) {
       hideLoading()
     }
@@ -239,32 +240,32 @@ service.interceptors.response.use(
 // 封装请求方法
 export const request = {
   // GET请求
-  get<T = any>(url: string, config?: RequestConfig): Promise<AxiosResponse<ResponseData<T>>> {
+  get<T = any>(url: string, config?: RequestConfig) {
     return service.get(url, config)
   },
 
   // POST请求
-  post<T = any>(url: string, data?: any, config?: RequestConfig): Promise<AxiosResponse<ResponseData<T>>> {
+  post<T = any>(url: string, data?: any, config?: RequestConfig) {
     return service.post(url, data, config)
   },
 
   // PUT请求
-  put<T = any>(url: string, data?: any, config?: RequestConfig): Promise<AxiosResponse<ResponseData<T>>> {
+  put<T = any>(url: string, data?: any, config?: RequestConfig) {
     return service.put(url, data, config)
   },
 
   // DELETE请求
-  delete<T = any>(url: string, config?: RequestConfig): Promise<AxiosResponse<ResponseData<T>>> {
+  delete<T = any>(url: string, config?: RequestConfig) {
     return service.delete(url, config)
   },
 
   // PATCH请求
-  patch<T = any>(url: string, data?: any, config?: RequestConfig): Promise<AxiosResponse<ResponseData<T>>> {
+  patch<T = any>(url: string, data?: any, config?: RequestConfig) {
     return service.patch(url, data, config)
   },
 
   // 文件上传
-  upload<T = any>(url: string, formData: FormData, config?: RequestConfig): Promise<AxiosResponse<ResponseData<T>>> {
+  upload<T = any>(url: string, formData: FormData, config?: RequestConfig) {
     return service.post(url, formData, {
       ...config,
       headers: {
@@ -275,7 +276,7 @@ export const request = {
   },
 
   // 文件下载
-  download(url: string, config?: RequestConfig): Promise<AxiosResponse> {
+  download(url: string, config?: RequestConfig) {
     return service.get(url, {
       ...config,
       responseType: 'blob'

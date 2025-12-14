@@ -64,6 +64,7 @@ declare module 'vue' {
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
     ElUpload: typeof import('element-plus/es')['ElUpload']
     GlobalSearch: typeof import('./src/components/common/GlobalSearch.vue')['default']
+    GradeDetailDialog: typeof import('./src/components/GradeDetailDialog.vue')['default']
     GradeEntryDialog: typeof import('./src/components/GradeEntryDialog.vue')['default']
     GradeImportDialog: typeof import('./src/components/GradeImportDialog.vue')['default']
     NotificationDrawer: typeof import('./src/components/common/NotificationDrawer.vue')['default']

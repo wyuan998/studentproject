@@ -16,9 +16,7 @@ export default defineConfig({
         'pinia',
         {
           'axios': [
-            'default as axios',
-            'AxiosInstance as AxiosInstance',
-            'AxiosError as AxiosError'
+            'default as axios'
           ]
         },
         // 'dayjs',

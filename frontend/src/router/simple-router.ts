@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import SimpleApp from '@/SimpleApp.vue'
+import WorkingGrades from '@/views/WorkingGrades.vue'
 
 const routes = [
   {
@@ -8,12 +10,17 @@ const routes = [
   },
   {
     path: '/',
-    component: () => import('@/SimpleApp.vue'),
+    component: SimpleApp,
     children: [
       {
         path: '/dashboard',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/index.vue')
+      },
+      {
+        path: '/grades/list',
+        name: 'GradeList',
+        component: WorkingGrades
       },
       {
         path: '/students',
@@ -29,14 +36,6 @@ const routes = [
         path: '/courses',
         name: 'Courses',
         component: () => import('@/views/CourseManagement.vue')
-      },
-      {
-        path: '/grades',
-        name: 'GradeManagement',
-        component: () => import('@/views/GradeManagement.vue'),
-        meta: {
-          title: '成绩管理'
-        }
       }
     ]
   },

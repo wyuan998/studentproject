@@ -1,7 +1,5 @@
 {
   "globals": {
-    "AxiosError as AxiosError": true,
-    "AxiosInstance as AxiosInstance": true,
     "Component": true,
     "ComponentPublicInstance": true,
     "ComputedRef": true,
