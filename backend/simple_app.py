@@ -271,6 +271,31 @@ def init_sample_data():
         # 将示例教师添加到列表中
         teachers.extend(sample_teachers)
 
+        # 将学生和教师账号添加到users列表中以便登录
+        for student in sample_students:
+            users.append({
+                'id': student['id'],
+                'username': student['username'],
+                'password': student['password'],
+                'real_name': student['name'],
+                'email': student['email'],
+                'role': 'student',
+                'created_at': student['created_at'],
+                'status': 'active'
+            })
+
+        for teacher in sample_teachers:
+            users.append({
+                'id': teacher['id'] + 100,  # 避免ID冲突
+                'username': teacher['username'],
+                'password': teacher['password'],
+                'real_name': teacher['name'],
+                'email': teacher['email'],
+                'role': 'teacher',
+                'created_at': teacher['created_at'],
+                'status': 'active'
+            })
+
         # 添加六个示例课程
         sample_courses = [
             {
@@ -1810,10 +1835,6 @@ if __name__ == '__main__':
     print(f"服务地址: http://localhost:5000")
     print(f"API文档: http://localhost:5000/api/health")
     print(f"启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 50)
-    print("默认管理员账号:")
-    print("   用户名: admin")
-    print("   密码: 123456")
     print("=" * 50)
     print("系统正在启动中...")
 
