@@ -21,6 +21,14 @@ const routes = [
         component: () => import('@/views/dashboard/index.vue')
       },
       {
+        path: '/profile',
+        name: 'Profile',
+        component: () => import('@/views/user/Profile.vue'),
+        meta: {
+          title: '个人资料'
+        }
+      },
+      {
         path: '/students',
         name: 'Students',
         component: () => import('@/views/StudentManagement.vue')

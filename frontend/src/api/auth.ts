@@ -111,5 +111,21 @@ export const authApi = {
 
   // 获取活跃会话
   getActiveSessions: () =>
-    request.get('/auth/active-sessions')
+    request.get('/auth/active-sessions'),
+
+  // 获取个人信息
+  getProfile: () =>
+    request.get('/auth/profile'),
+
+  // 更新个人信息
+  updateProfile: (data: any) =>
+    request.put('/auth/profile', data),
+
+  // 上传头像
+  uploadAvatar: (avatarData: string) =>
+    request.post('/auth/avatar', { avatar: avatarData }),
+
+  // 删除头像
+  deleteAvatar: () =>
+    request.delete('/auth/avatar')
 }
