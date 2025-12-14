@@ -21,6 +21,14 @@ const routes = [
         component: () => import('@/views/dashboard/index.vue')
       },
       {
+        path: '/profile',
+        name: 'Profile',
+        component: () => import('@/views/user/Profile.vue'),
+        meta: {
+          title: '个人资料'
+        }
+      },
+      {
         path: '/students',
         name: 'Students',
         component: () => import('@/views/StudentManagement.vue')
@@ -41,6 +49,22 @@ const routes = [
         component: () => import('@/views/GradeManagement.vue'),
         meta: {
           title: '成绩管理'
+        }
+      },
+      {
+        path: '/system-settings',
+        name: 'SystemSettings',
+        component: () => import('@/views/admin/SystemSettings.vue'),
+        meta: {
+          title: '系统设置'
+        }
+      },
+      {
+        path: '/config-management',
+        name: 'ConfigManagement',
+        component: () => import('@/views/admin/ConfigManagement.vue'),
+        meta: {
+          title: '配置管理'
         }
       }
     ]

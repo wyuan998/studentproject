@@ -97,8 +97,8 @@
         </el-row>
 
         <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="学生号" prop="student_id">
+          <el-col :span="24">
+            <el-form-item label="学生号（选填）" prop="student_id">
               <el-input
                 v-model="registerForm.student_id"
                 placeholder="请输入学生号"
@@ -106,24 +106,6 @@
                 clearable
                 :disabled="loading"
               />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="验证码" prop="captcha">
-              <div class="captcha-container">
-                <el-input
-                  v-model="registerForm.captcha"
-                  placeholder="验证码"
-                  prefix-icon="Key"
-                  clearable
-                  :disabled="loading"
-                  style="flex: 1; margin-right: 12px"
-                />
-                <div class="captcha-image" @click="refreshCaptcha">
-                  <img v-if="captchaData?.captcha_image" :src="captchaData.captcha_image" alt="验证码" />
-                  <el-skeleton v-else :rows="1" animated />
-                </div>
-              </div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -221,7 +203,6 @@ const registerFormRef = ref<FormInstance>()
 const loading = ref(false)
 const showAgreement = ref(false)
 const showPrivacy = ref(false)
-const captchaData = ref<{ captcha_image: string; captcha_id: string } | null>(null)
 
 const registerForm = reactive({
   username: '',
@@ -231,7 +212,6 @@ const registerForm = reactive({
   phone: '',
   real_name: '',
   student_id: '',
-  captcha: '',
   agreement: false
 })
 
@@ -282,12 +262,7 @@ const registerRules: FormRules = {
     }
   ],
   student_id: [
-    { required: true, message: '请输入学生号', trigger: 'blur' },
     { pattern: /^\d{10,12}$/, message: '学生号应为10-12位数字', trigger: 'blur' }
-  ],
-  captcha: [
-    { required: true, message: '请输入验证码', trigger: 'blur' },
-    { len: 4, message: '验证码长度为4位', trigger: 'blur' }
   ],
   agreement: [
     {
@@ -304,21 +279,6 @@ const registerRules: FormRules = {
 }
 
 // 方法
-const getCaptcha = async () => {
-  try {
-    const response = await authApi.getCaptcha()
-    if (response.data?.data) {
-      captchaData.value = response.data.data
-    }
-  } catch (error) {
-    console.error('Get captcha error:', error)
-  }
-}
-
-const refreshCaptcha = () => {
-  captchaData.value = null
-  getCaptcha()
-}
 
 const checkUsername = async () => {
   if (!registerForm.username || registerForm.username.length < 3) return
@@ -361,9 +321,7 @@ const handleRegister = async () => {
       confirm_password: registerForm.confirm_password,
       phone: registerForm.phone,
       real_name: registerForm.real_name,
-      student_id: registerForm.student_id,
-      captcha: registerForm.captcha,
-      captcha_id: captchaData.value?.captcha_id || ''
+      student_id: registerForm.student_id
     })
 
     if (success) {
@@ -385,8 +343,6 @@ onMounted(() => {
     router.replace('/dashboard')
     return
   }
-
-  getCaptcha()
 })
 </script>
 

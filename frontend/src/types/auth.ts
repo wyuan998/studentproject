@@ -55,6 +55,22 @@ export interface UpdateUserInfoData {
   avatar?: string
 }
 
+export interface UserProfileData {
+  first_name?: string
+  last_name?: string
+  phone?: string
+  gender?: 'male' | 'female' | 'other'
+  birthday?: string
+  address?: string
+  city?: string
+  province?: string
+  postal_code?: string
+  department?: string
+  major?: string
+  degree?: string
+  email?: string
+}
+
 export interface CaptchaResponse {
   captcha_id: string
   captcha_image: string

@@ -6,10 +6,10 @@ from sqlalchemy import desc, or_
 from datetime import datetime, timedelta
 import json
 
-from ..models import SystemConfig, User, AuditLog, db
-from ..utils.responses import success_response, error_response
-from ..utils.decorators import require_permission
-from ..schemas.system_config import SystemConfigSchema, SystemConfigCreateSchema, SystemConfigUpdateSchema
+from models import SystemConfig, User, AuditLog, db
+from schemas import SystemConfigSchema, SystemConfigCreateSchema, SystemConfigUpdateSchema, SystemConfigBatchUpdateSchema
+from utils.responses import success_response, error_response, validation_error_response
+from utils.decorators import require_permission
 
 api = Namespace('system-config', description='系统配置管理')
 
@@ -37,6 +37,7 @@ config_schema = SystemConfigSchema()
 configs_schema = SystemConfigSchema(many=True)
 config_create_schema = SystemConfigCreateSchema()
 config_update_schema = SystemConfigUpdateSchema()
+config_batch_update_schema = SystemConfigBatchUpdateSchema()
 
 @api.route('')
 class SystemConfigList(Resource):
@@ -237,7 +238,10 @@ class SystemConfigBatch(Resource):
                     # 验证并更新数据
                     validated_data = config_update_schema.load(config_data, partial=True)
                     for field, value in validated_data.items():
-                        setattr(config, field, value)
+                        if field == 'value':
+                            config.value = value  # 使用属性设置器进行验证
+                        else:
+                            setattr(config, field, value)
 
                     updated_configs.append(config)
 

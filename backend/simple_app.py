@@ -628,18 +628,24 @@ def login():
                 break
 
         if user:
+            # 构建响应数据
+            user_data = {
+                'id': user['id'],
+                'username': user['username'],
+                'real_name': user.get('real_name', user['username']),
+                'email': user.get('email', ''),
+                'role': user.get('role', 'student'),
+                'permissions': ['read', 'write'],  # 简化的权限
+                'roles': [user.get('role', 'student')]
+            }
+
             return jsonify({
                 'success': True,
                 'message': '登录成功',
                 'data': {
-                    'user': {
-                        'id': user['id'],
-                        'username': user['username'],
-                        'real_name': user['real_name'],
-                        'email': user['email'],
-                        'role': user['role']
-                    },
-                    'token': 'mock-jwt-token-' + str(user['id'])
+                    'access_token': 'mock-jwt-token-' + str(user['id']),
+                    'refresh_token': 'mock-refresh-token-' + str(user['id']),
+                    'user_info': user_data
                 }
             })
         else:
@@ -652,6 +658,238 @@ def login():
         return jsonify({
             'success': False,
             'message': '服务器处理错误'
+        }), 500
+
+@app.route('/api/auth/register', methods=['POST', 'OPTIONS'])
+def register():
+    """用户注册"""
+    # 处理OPTIONS预检请求
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        # 确保正确解析JSON数据
+        if request.is_json:
+            data = request.get_json()
+        else:
+            # 尝试手动解析数据
+            raw_data = request.get_data(as_text=True)
+            if raw_data:
+                data = json.loads(raw_data)
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '请求数据为空'
+                }), 400
+
+        # 获取注册信息
+        username = data.get('username')
+        email = data.get('email')
+        password = data.get('password')
+        confirm_password = data.get('confirm_password')
+        phone = data.get('phone')
+        real_name = data.get('real_name')
+        student_id = data.get('student_id')
+
+        # 验证必填字段
+        if not all([username, email, password, confirm_password, real_name]):
+            return jsonify({
+                'success': False,
+                'message': '请填写所有必填字段'
+            }), 400
+
+        # 验证密码匹配
+        if password != confirm_password:
+            return jsonify({
+                'success': False,
+                'message': '两次输入的密码不一致'
+            }), 400
+
+        # 验证密码长度
+        if len(password) < 6:
+            return jsonify({
+                'success': False,
+                'message': '密码长度至少为6位'
+            }), 400
+
+        # 验证用户名长度
+        if len(username) < 3:
+            return jsonify({
+                'success': False,
+                'message': '用户名长度至少为3位'
+            }), 400
+
+        # 验证邮箱格式
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, email):
+            return jsonify({
+                'success': False,
+                'message': '请输入有效的邮箱地址'
+            }), 400
+
+        # 验证手机号格式
+        if phone:
+            phone_pattern = r'^1[3-9]\d{9}$'
+            if not re.match(phone_pattern, phone):
+                return jsonify({
+                    'success': False,
+                    'message': '请输入有效的手机号'
+                }), 400
+
+        # 检查用户名是否已存在
+        for u in users:
+            if u['username'] == username:
+                return jsonify({
+                    'success': False,
+                    'message': '用户名已存在'
+                }), 400
+
+        # 检查邮箱是否已存在
+        for u in users:
+            if u.get('email') == email:
+                return jsonify({
+                    'success': False,
+                    'message': '邮箱已被注册'
+                }), 400
+
+        # 检查学号是否已存在
+        if student_id:
+            for s in students:
+                if s.get('student_id') == student_id:
+                    return jsonify({
+                        'success': False,
+                        'message': '学号已存在'
+                    }), 400
+
+        # 创建新用户（作为学生角色）
+        new_user = {
+            'id': len(users) + 1,
+            'username': username,
+            'password': password,  # 实际应用中应该加密存储
+            'real_name': real_name,
+            'email': email,
+            'phone': phone,
+            'role': 'student',  # 注册用户默认为学生角色
+            'created_at': datetime.now().isoformat(),
+            'status': 'active'
+        }
+
+        # 将用户添加到用户列表
+        users.append(new_user)
+
+        # 如果提供了学号信息，同时添加到学生列表
+        if student_id:
+            # 检查该学号是否已存在
+            student_exists = False
+            for s in students:
+                if s.get('student_id') == student_id:
+                    student_exists = True
+                    break
+
+            if not student_exists:
+                new_student = {
+                    'id': len(students) + 1,
+                    'student_id': student_id,
+                    'name': real_name,
+                    'gender': '',  # 可以后续完善
+                    'birth_date': '',
+                    'phone': phone,
+                    'email': email,
+                    'username': username,
+                    'password': password,
+                    'major': '',  # 可以后续完善
+                    'class_name': '',  # 可以后续完善
+                    'enrollment_date': datetime.now().strftime('%Y-%m-%d'),
+                    'address': '',
+                    'status': 'active',
+                    'created_at': datetime.now().isoformat()
+                }
+                students.append(new_student)
+
+        logger.info(f"成功注册用户: {username}")
+
+        return jsonify({
+            'success': True,
+            'message': '注册成功！',
+            'data': {
+                'user': {
+                    'id': new_user['id'],
+                    'username': new_user['username'],
+                    'real_name': new_user['real_name'],
+                    'email': new_user['email'],
+                    'role': new_user['role']
+                }
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"注册错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '注册失败，请稍后重试'
+        }), 500
+
+@app.route('/api/auth/check-username', methods=['GET'])
+def check_username():
+    """检查用户名是否可用"""
+    try:
+        username = request.args.get('username')
+        if not username:
+            return jsonify({
+                'success': False,
+                'message': '缺少用户名参数'
+            }), 400
+
+        # 检查用户名是否已存在
+        for u in users:
+            if u['username'] == username:
+                return jsonify({
+                    'success': False,
+                    'message': '用户名已存在'
+                })
+
+        return jsonify({
+            'success': True,
+            'message': '用户名可用'
+        })
+
+    except Exception as e:
+        logger.error(f"检查用户名错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '检查失败'
+        }), 500
+
+@app.route('/api/auth/check-email', methods=['GET'])
+def check_email():
+    """检查邮箱是否可用"""
+    try:
+        email = request.args.get('email')
+        if not email:
+            return jsonify({
+                'success': False,
+                'message': '缺少邮箱参数'
+            }), 400
+
+        # 检查邮箱是否已存在
+        for u in users:
+            if u.get('email') == email:
+                return jsonify({
+                    'success': False,
+                    'message': '邮箱已被注册'
+                })
+
+        return jsonify({
+            'success': True,
+            'message': '邮箱可用'
+        })
+
+    except Exception as e:
+        logger.error(f"检查邮箱错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '检查失败'
         }), 500
 
 # 学生管理路由

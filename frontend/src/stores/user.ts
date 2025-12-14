@@ -75,12 +75,12 @@ export const useUserStore = defineStore('user', () => {
       loginLoading.value = true
       const response = await authApi.register(registerData)
 
-      if (response.success) {
-        ElMessage.success('注册成功，请登录')
-        router.push('/login')
+      // 检查响应格式
+      if (response.data?.success) {
+        ElMessage.success(response.data.message || '注册成功，请登录')
         return true
       } else {
-        ElMessage.error(response.message || '注册失败')
+        ElMessage.error(response.data?.message || '注册失败')
         return false
       }
     } catch (error: any) {
