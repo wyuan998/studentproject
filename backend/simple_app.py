@@ -27,10 +27,10 @@ app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # 确保中文字符正确编码
 app.config['JSON_SORT_KEYS'] = False
 
-# 配置CORS - 支持localhost:3000, 3001, 3002并允许所有必要的方法和头
+# 配置CORS - 支持localhost:3000-3005并允许所有必要的方法和头
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003"],
+        "origins": ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003", "http://localhost:3004", "http://localhost:3005"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
         "supports_credentials": True
@@ -52,6 +52,122 @@ teachers = []
 courses = []
 grades = []
 profile_history = []  # 个人信息变更历史
+
+# 权限配置
+ROLE_PERMISSIONS = {
+    'admin': [
+        'read', 'write', 'delete', 'manage_users', 'manage_courses',
+        'manage_grades', 'system_settings', 'view_all_students', 'view_all_teachers',
+        'view_all_courses', 'manage_system', 'export_data', 'import_data'
+    ],
+    'teacher': [
+        'read', 'write', 'manage_own_courses', 'manage_grades', 'view_students',
+        'view_assigned_courses', 'edit_own_profile', 'publish_grades'
+    ],
+    'student': [
+        'read', 'view_own_grades', 'view_own_courses', 'edit_own_profile',
+        'view_enrolled_courses', 'select_courses', 'drop_courses'
+    ]
+}
+
+# 权限等级配置（用于权限比较）
+ROLE_HIERARCHY = {
+    'admin': 100,
+    'teacher': 50,
+    'student': 10
+}
+
+def get_role_permissions(role):
+    """根据角色返回权限列表"""
+    return ROLE_PERMISSIONS.get(role, ['read'])
+
+def check_permission(user_role: str, required_permission: str) -> bool:
+    """检查用户是否具有指定权限"""
+    user_permissions = get_role_permissions(user_role)
+    return required_permission in user_permissions
+
+def check_role_hierarchy(user_role: str, required_role: str) -> bool:
+    """检查用户角色等级是否满足要求"""
+    return ROLE_HIERARCHY.get(user_role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
+
+def require_permission(permission):
+    """权限验证装饰器"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            # 在实际应用中，这里应该从JWT token中获取用户信息
+            # 这里简化处理，从请求中获取用户信息
+            auth_header = request.headers.get('Authorization')
+            if not auth_header:
+                return jsonify({
+                    'success': False,
+                    'message': '缺少认证信息'
+                }), 401
+
+            # 模拟从token中解析用户信息
+            # 在实际应用中，应该验证JWT token
+            try:
+                token = auth_header.replace('Bearer ', '')
+                # 简化处理：根据token模拟用户角色
+                if 'admin' in token.lower():
+                    user_role = 'admin'
+                elif 'teacher' in token.lower():
+                    user_role = 'teacher'
+                else:
+                    user_role = 'student'
+            except:
+                return jsonify({
+                    'success': False,
+                    'message': '无效的认证信息'
+                }), 401
+
+            # 检查权限
+            if not check_permission(user_role, permission):
+                return jsonify({
+                    'success': False,
+                    'message': f'权限不足，需要权限: {permission}'
+                }), 403
+
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def require_role(required_role):
+    """角色验证装饰器"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            # 在实际应用中，这里应该从JWT token中获取用户信息
+            auth_header = request.headers.get('Authorization')
+            if not auth_header:
+                return jsonify({
+                    'success': False,
+                    'message': '缺少认证信息'
+                }), 401
+
+            # 模拟从token中解析用户角色
+            try:
+                token = auth_header.replace('Bearer ', '')
+                if 'admin' in token.lower():
+                    user_role = 'admin'
+                elif 'teacher' in token.lower():
+                    user_role = 'teacher'
+                else:
+                    user_role = 'student'
+            except:
+                return jsonify({
+                    'success': False,
+                    'message': '无效的认证信息'
+                }), 401
+
+            # 检查角色等级
+            if not check_role_hierarchy(user_role, required_role):
+                return jsonify({
+                    'success': False,
+                    'message': f'角色等级不足，需要角色: {required_role} 或更高'
+                }), 403
+
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 # 初始化一些示例数据
 def init_sample_data():
@@ -644,15 +760,19 @@ def login():
                 break
 
         if user:
+            # 根据角色设置不同的权限
+            role = user.get('role', 'student')
+            permissions = get_role_permissions(role)
+
             # 构建响应数据
             user_data = {
                 'id': user['id'],
                 'username': user['username'],
                 'real_name': user.get('real_name', user['username']),
                 'email': user.get('email', ''),
-                'role': user.get('role', 'student'),
-                'permissions': ['read', 'write'],  # 简化的权限
-                'roles': [user.get('role', 'student')]
+                'role': role,
+                'permissions': permissions,
+                'roles': [role]
             }
 
             return jsonify({
@@ -916,6 +1036,34 @@ def get_students():
     if request.method == 'OPTIONS':
         return '', 200
 
+    # 权限检查 - 获取学生列表需要相应权限
+    auth_header = request.headers.get('Authorization')
+    if auth_header:
+        # 如果有认证信息，检查权限
+        if 'admin' in auth_header:
+            required_permission = 'view_all_students'
+        elif 'teacher' in auth_header:
+            required_permission = 'view_students'
+        else:
+            required_permission = 'read'
+
+        try:
+            token = auth_header.replace('Bearer ', '')
+            if 'admin' in token.lower():
+                user_role = 'admin'
+            elif 'teacher' in token.lower():
+                user_role = 'teacher'
+            else:
+                user_role = 'student'
+
+            if not check_permission(user_role, required_permission):
+                return jsonify({
+                    'success': False,
+                    'message': f'权限不足，需要权限: {required_permission}'
+                }), 403
+        except:
+            pass  # 如果token解析失败，继续执行（允许公开访问基础信息）
+
     try:
         page = request.args.get('page', 1, type=int)
         page_size = request.args.get('pageSize', 20, type=int)
@@ -953,6 +1101,14 @@ def get_students():
 @app.route('/api/students', methods=['POST'])
 def create_student():
     """创建学生"""
+    # 权限检查 - 创建学生需要管理员权限
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or 'admin' not in auth_header:
+        return jsonify({
+            'success': False,
+            'message': '权限不足，只有管理员可以创建学生'
+        }), 403
+
     try:
         logger.info("收到创建学生请求")
 
@@ -1193,6 +1349,14 @@ def get_teachers():
 @app.route('/api/teachers', methods=['POST'])
 def create_teacher():
     """创建教师"""
+    # 权限检查 - 创建教师需要管理员权限
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or 'admin' not in auth_header:
+        return jsonify({
+            'success': False,
+            'message': '权限不足，只有管理员可以创建教师'
+        }), 403
+
     try:
         logger.info("收到创建教师请求")
 
@@ -2502,6 +2666,92 @@ def logout():
         'message': '退出成功'
     })
 
+@app.route('/api/auth/permissions', methods=['GET'])
+def get_user_permissions():
+    """获取当前用户的权限列表"""
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({
+                'success': False,
+                'message': '缺少认证信息'
+            }), 401
+
+        # 模拟从token中解析用户信息
+        token = auth_header.replace('Bearer ', '')
+        if 'admin' in token.lower():
+            user_role = 'admin'
+        elif 'teacher' in token.lower():
+            user_role = 'teacher'
+        else:
+            user_role = 'student'
+
+        permissions = get_role_permissions(user_role)
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'role': user_role,
+                'permissions': permissions,
+                'hierarchy_level': ROLE_HIERARCHY.get(user_role, 0)
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"获取权限信息错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取权限信息失败'
+        }), 500
+
+@app.route('/api/auth/check-permission', methods=['POST'])
+def check_user_permission():
+    """检查用户是否具有特定权限"""
+    try:
+        data = request.get_json()
+        required_permission = data.get('permission')
+
+        if not required_permission:
+            return jsonify({
+                'success': False,
+                'message': '缺少权限参数'
+            }), 400
+
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({
+                'success': False,
+                'message': '缺少认证信息'
+            }), 401
+
+        # 模拟从token中解析用户信息
+        token = auth_header.replace('Bearer ', '')
+        if 'admin' in token.lower():
+            user_role = 'admin'
+        elif 'teacher' in token.lower():
+            user_role = 'teacher'
+        else:
+            user_role = 'student'
+
+        has_permission = check_permission(user_role, required_permission)
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'has_permission': has_permission,
+                'user_role': user_role,
+                'required_permission': required_permission,
+                'user_permissions': get_role_permissions(user_role)
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"权限检查错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '权限检查失败'
+        }), 500
+
 # 错误处理
 @app.errorhandler(404)
 def not_found(error):
@@ -2516,6 +2766,286 @@ def internal_error(error):
         'success': False,
         'message': '服务器内部错误'
     }), 500
+
+# 用户个人数据路由
+@app.route('/api/user/profile', methods=['GET', 'OPTIONS'])
+def get_user_profile():
+    """获取当前用户的个人信息"""
+    # 处理OPTIONS预检请求
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        # 在实际应用中，这里应该从JWT token中获取用户ID
+        # 这里简化处理，从请求参数中获取用户ID
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'message': '用户ID不能为空'
+            }), 400
+
+        # 查找用户基本信息
+        user = None
+        for u in users:
+            if str(u['id']) == user_id:
+                user = u
+                break
+
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        # 根据角色返回不同的个人信息
+        role = user.get('role', 'student')
+        profile_data = {}
+
+        if role == 'student':
+            # 查找学生详细信息
+            for student in students:
+                if student['id'] == user['id']:
+                    profile_data = {
+                        'user_id': student['id'],
+                        'student_id': student['student_id'],
+                        'name': student['name'],
+                        'gender': student['gender'],
+                        'birth_date': student['birth_date'],
+                        'phone': student['phone'],
+                        'email': student['email'],
+                        'major': student['major'],
+                        'class_name': student['class_name'],
+                        'enrollment_date': student['enrollment_date'],
+                        'address': student['address'],
+                        'status': student['status']
+                    }
+                    break
+        elif role == 'teacher':
+            # 查找教师详细信息
+            for teacher in teachers:
+                if teacher['id'] == user['id']:
+                    profile_data = {
+                        'user_id': teacher['id'],
+                        'teacher_id': teacher['teacher_id'],
+                        'name': teacher['name'],
+                        'gender': teacher['gender'],
+                        'birth_date': teacher['birth_date'],
+                        'phone': teacher['phone'],
+                        'email': teacher['email'],
+                        'department': teacher['department'],
+                        'title': teacher['title'],
+                        'hire_date': teacher['hire_date'],
+                        'address': teacher['address'],
+                        'status': teacher['status']
+                    }
+                    break
+        else:
+            # 管理员信息
+            profile_data = {
+                'user_id': user['id'],
+                'name': user['real_name'],
+                'email': user['email'],
+                'role': user['role'],
+                'status': user.get('status', 'active')
+            }
+
+        return jsonify({
+            'success': True,
+            'data': profile_data
+        })
+
+    except Exception as e:
+        logger.error(f"获取用户信息错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取用户信息失败'
+        }), 500
+
+@app.route('/api/user/courses', methods=['GET', 'OPTIONS'])
+def get_user_courses():
+    """获取当前用户的课程信息"""
+    # 处理OPTIONS预检请求
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'message': '用户ID不能为空'
+            }), 400
+
+        # 查找用户
+        user = None
+        for u in users:
+            if str(u['id']) == user_id:
+                user = u
+                break
+
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        role = user.get('role', 'student')
+        user_courses = []
+
+        if role == 'student':
+            # 学生只能看到自己选择的课程
+            user_id_int = int(user_id)
+            student_courses = [
+                {
+                    'course_id': course['id'],
+                    'course_code': course['course_code'],
+                    'course_name': course['course_name'],
+                    'credits': course['credits'],
+                    'teacher_name': course['teacher_name'],
+                    'schedule': course['schedule'],
+                    'location': course['location'],
+                    'status': 'selected',
+                    'enrollment_date': '2024-09-01'
+                }
+                for course in courses
+                if user_id_int in [1, 2, 3]  # 简化：前三个学生选择了这些课程
+            ]
+            user_courses = student_courses
+
+        elif role == 'teacher':
+            # 教师可以看到自己教授的课程
+            teacher_id_map = {1: 1, 2: 2, 3: 3, 4: 3, 5: 5, 6: 6}
+            teacher_course_id = teacher_id_map.get(int(user_id), 1)
+
+            user_courses = [
+                {
+                    'course_id': course['id'],
+                    'course_code': course['course_code'],
+                    'course_name': course['course_name'],
+                    'credits': course['credits'],
+                    'hours': course['hours'],
+                    'course_type': course['course_type'],
+                    'max_students': course['max_students'],
+                    'current_students': course['current_students'],
+                    'schedule': course['schedule'],
+                    'location': course['location'],
+                    'status': course['status'],
+                    'semester': course['semester']
+                }
+                for course in courses
+                if course['teacher_id'] == teacher_course_id
+            ]
+
+        else:
+            # 管理员可以看到所有课程
+            user_courses = courses
+
+        return jsonify({
+            'success': True,
+            'data': user_courses
+        })
+
+    except Exception as e:
+        logger.error(f"获取用户课程错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取课程信息失败'
+        }), 500
+
+@app.route('/api/user/grades', methods=['GET', 'OPTIONS'])
+def get_user_grades():
+    """获取当前用户的成绩信息"""
+    # 处理OPTIONS预检请求
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'message': '用户ID不能为空'
+            }), 400
+
+        # 查找用户
+        user = None
+        for u in users:
+            if str(u['id']) == user_id:
+                user = u
+                break
+
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        role = user.get('role', 'student')
+        user_grades = []
+
+        if role == 'student':
+            # 学生只能看到自己的成绩
+            user_id_int = int(user_id)
+            student_grades = [
+                {
+                    'grade_id': grade['id'],
+                    'course_name': grade['course_name'],
+                    'exam_type': grade['exam_type'],
+                    'score': grade['score'],
+                    'max_score': grade['max_score'],
+                    'percentage': grade['percentage'],
+                    'letter_grade': grade['letter_grade'],
+                    'grade_point': grade['grade_point'],
+                    'semester': grade['semester'],
+                    'is_published': grade['is_published'],
+                    'comments': grade.get('comments', ''),
+                    'graded_at': grade.get('graded_at', '')
+                }
+                for grade in grades
+                if grade['student_id'] == f"S202100{user_id_int}"  # 匹配学生学号
+            ]
+            user_grades = student_grades
+
+        elif role == 'teacher':
+            # 教师可以看到自己教授的课程的学生成绩
+            teacher_course_map = {1: [1], 2: [2], 3: [3]}  # 简化映射
+            teacher_courses = teacher_course_map.get(int(user_id), [1])
+
+            user_grades = [
+                {
+                    'grade_id': grade['id'],
+                    'student_name': grade['student_name'],
+                    'student_id': grade['student_id'],
+                    'course_name': grade['course_name'],
+                    'exam_type': grade['exam_type'],
+                    'score': grade['score'],
+                    'max_score': grade['max_score'],
+                    'percentage': grade['percentage'],
+                    'letter_grade': grade['letter_grade'],
+                    'semester': grade['semester'],
+                    'is_published': grade['is_published'],
+                    'graded_at': grade.get('graded_at', '')
+                }
+                for grade in grades
+                if grade['course_id'] in teacher_courses
+            ]
+
+        else:
+            # 管理员可以看到所有成绩
+            user_grades = grades
+
+        return jsonify({
+            'success': True,
+            'data': user_grades
+        })
+
+    except Exception as e:
+        logger.error(f"获取用户成绩错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取成绩信息失败'
+        }), 500
 
 if __name__ == '__main__':
     print("=" * 50)

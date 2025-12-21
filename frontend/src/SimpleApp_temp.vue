@@ -384,7 +384,6 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import './SimpleApp.css'
 
 const router = useRouter()
 const route = useRoute()
@@ -395,10 +394,14 @@ const userInfo = computed(() => userStore.userInfo)
 const userRole = computed(() => {
   const role = userStore.userInfo?.role || 'student'
   const roles = userStore.roles || []
+  console.log('SimpleApp - 用户角色检查:', {
+    role,
+    roles,
+    userInfo: userStore.userInfo,
+    finalRole: role
+  })
   return role
 })
-
-const isAdmin = computed(() => userRole.value === 'admin')
 
 // 侧边栏菜单配置
 const sidebarMenus = computed(() => {
@@ -506,10 +509,106 @@ const notificationSettings = ref({
 // 当前路由的元信息
 const currentRouteMeta = computed(() => route.meta)
 
+// 成绩数据
+const gradesData = ref([
+  {
+    id: 1,
+    student_name: '张三',
+    student_no: 'S2021001',
+    course_name: '计算机科学导论',
+    exam_type: '期中考试',
+    score: 85,
+    max_score: 100,
+    is_published: true
+  },
+  {
+    id: 2,
+    student_name: '张三',
+    student_no: 'S2021001',
+    course_name: '计算机科学导论',
+    exam_type: '期末考试',
+    score: 88,
+    max_score: 100,
+    is_published: true
+  },
+  {
+    id: 3,
+    student_name: '李四',
+    student_no: 'S2021002',
+    course_name: '计算机科学导论',
+    exam_type: '期中考试',
+    score: 92,
+    max_score: 100,
+    is_published: true
+  },
+  {
+    id: 4,
+    student_name: '李四',
+    student_no: 'S2021002',
+    course_name: '软件工程',
+    exam_type: '作业',
+    score: 95,
+    max_score: 100,
+    is_published: true
+  },
+  {
+    id: 5,
+    student_name: '王五',
+    student_no: 'S2021003',
+    course_name: '软件工程',
+    exam_type: '测验',
+    score: 76,
+    max_score: 100,
+    is_published: false
+  },
+  {
+    id: 6,
+    student_name: '王五',
+    student_no: 'S2021003',
+    course_name: '数据结构与算法',
+    exam_type: '项目',
+    score: 82,
+    max_score: 100,
+    is_published: true
+  }
+])
+
+// 响应式数据
+const gradeSearchQuery = ref('')
+const selectedGrades = ref([])
+
+// 计算属性
+const showGradesList = computed(() => route.path === '/grades/list')
+
+const filteredGrades = computed(() => {
+  if (!gradeSearchQuery.value) return gradesData.value
+  const query = gradeSearchQuery.value.toLowerCase()
+  return gradesData.value.filter(grade =>
+    grade.student_name.toLowerCase().includes(query) ||
+    grade.student_no.toLowerCase().includes(query) ||
+    grade.course_name.toLowerCase().includes(query) ||
+    grade.exam_type.toLowerCase().includes(query)
+  )
+})
+
+const publishedCount = computed(() => gradesData.value.filter(g => g.is_published).length)
+const unpublishedCount = computed(() => gradesData.value.filter(g => !g.is_published).length)
+const averageScore = computed(() => {
+  const total = gradesData.value.reduce((sum, g) => sum + g.score, 0)
+  return (total / gradesData.value.length).toFixed(1)
+})
+
 // 处理菜单选择
 const handleMenuSelect = (index: string) => {
+  console.log('菜单点击:', index)
+  console.log('当前路径:', route.path)
+
+  
   if (index !== route.path) {
+    console.log('跳转到:', index)
     router.push(index)
+  } else {
+    console.log('路径相同，不跳转')
   }
 }
 
@@ -517,6 +616,7 @@ const handleMenuSelect = (index: string) => {
 const handleUserCommand = async (command: string) => {
   switch (command) {
     case 'profile':
+      // 根据角色跳转到不同的个人资料页面
       if (userRole.value === 'admin') {
         router.push('/profile')
       } else if (userRole.value === 'teacher') {
@@ -526,6 +626,7 @@ const handleUserCommand = async (command: string) => {
       }
       break
     case 'settings':
+      // 只有管理员可以访问系统设置
       if (userRole.value === 'admin') {
         router.push('/system-settings')
       } else {
@@ -551,6 +652,81 @@ const logout = async () => {
   await userStore.logout()
 }
 
+const goToDashboard = () => {
+  router.push('/dashboard')
+}
+
+// 成绩管理相关方法
+const handleGradeSearch = () => {
+  console.log('搜索成绩:', gradeSearchQuery.value)
+}
+
+const handleAddGrade = () => {
+  ElMessage.info('录入成绩功能开发中')
+}
+
+const handleImportGrades = () => {
+  ElMessage.info('批量导入功能开发中')
+}
+
+const handleExportGrades = () => {
+  ElMessage.info('导出数据功能开发中')
+}
+
+const handleBatchDelete = () => {
+  ElMessage.info('批量删除功能开发中')
+}
+
+const handleGradeSelectionChange = (selection) => {
+  selectedGrades.value = selection
+}
+
+const handleViewGrade = (row) => {
+  ElMessage.info('查看成绩详情功能开发中')
+}
+
+const handleEditGrade = (row) => {
+  ElMessage.info('编辑成绩功能开发中')
+}
+
+const handlePublishGrade = (row) => {
+  row.is_published = true
+  ElMessage.success('成绩已发布')
+}
+
+const handleDeleteGrade = (row) => {
+  ElMessage.info('删除成绩功能开发中')
+}
+
+// 工具函数
+const getExamTypeTag = (type) => {
+  const typeMap = {
+    '期中考试': 'warning',
+    '期末考试': 'danger',
+    '作业': 'primary',
+    '测验': 'info',
+    '项目': 'success'
+  }
+  return typeMap[type] || 'info'
+}
+
+const getExamTypeText = (type) => {
+  return type
+}
+
+const getScoreColor = (score, maxScore) => {
+  const percentage = (score / maxScore) * 100
+  if (percentage >= 90) return '#67C23A'
+  if (percentage >= 80) return '#409EFF'
+  if (percentage >= 70) return '#E6A23C'
+  if (percentage >= 60) return '#F56C6C'
+  return '#F56C6C'
+}
+
+const getPercentage = (score, maxScore) => {
+  return ((score / maxScore) * 100).toFixed(1)
+}
+
 // 个人信息相关方法
 const getAvatarText = () => {
   return (userInfo.value?.username || 'U').charAt(0).toUpperCase()
@@ -570,6 +746,7 @@ const formatAddress = () => {
 }
 
 const handleUpdateProfile = () => {
+  // 模拟更新
   Object.assign(profileData.value, editForm.value)
   showEditDialog.value = false
   ElMessage.success('个人信息更新成功')
@@ -591,9 +768,11 @@ const handleChangePassword = () => {
     return
   }
 
+  // 模拟修改密码
   showPasswordDialog.value = false
   ElMessage.success('密码修改成功')
 
+  // 重置表单
   passwordForm.value = {
     old_password: '',
     new_password: '',
@@ -616,11 +795,13 @@ const handleFileChange = (event: Event) => {
   const file = target.files?.[0]
 
   if (file) {
+    // 检查文件大小（2MB）
     if (file.size > 2 * 1024 * 1024) {
       ElMessage.error('图片大小不能超过2MB')
       return
     }
 
+    // 检查文件类型
     if (!file.type.startsWith('image/')) {
       ElMessage.error('请选择图片文件')
       return
@@ -628,6 +809,7 @@ const handleFileChange = (event: Event) => {
 
     avatarFile.value = file
 
+    // 生成预览
     const reader = new FileReader()
     reader.onload = (e) => {
       avatarPreview.value = e.target?.result as string
@@ -642,6 +824,7 @@ const handleUploadAvatar = () => {
     return
   }
 
+  // 模拟上传
   profileData.value.avatar_url = avatarPreview.value
   showAvatarDialog.value = false
   ElMessage.success('头像上传成功')
@@ -670,6 +853,7 @@ const handleExportProfile = () => {
     }
   }
 
+  // 创建下载链接
   const blob = new Blob([JSON.stringify(exportData, null, 2)], {
     type: 'application/json'
   })
@@ -709,6 +893,7 @@ const saveNotificationSettings = () => {
 // 监听编辑对话框打开
 const watchEditDialog = (show: boolean) => {
   if (show) {
+    // 加载当前数据到编辑表单
     Object.assign(editForm.value, profileData.value)
   }
 }
@@ -716,11 +901,193 @@ const watchEditDialog = (show: boolean) => {
 watch(showEditDialog, watchEditDialog)
 
 onMounted(() => {
+  // 临时调试：强制清除错误的localStorage数据
+  if (window.location.search.includes('clear=1')) {
+    console.log('强制清除localStorage')
+    localStorage.clear()
+  }
+
+  // 初始化用户信息
   userStore.initUserInfo()
 })
 </script>
 
 <style scoped>
+.simple-app {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.dashboard {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 32px;
+  height: 64px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  position: relative;
+  z-index: 100;
+}
+
+.header-left h1 {
+  color: #1e40af;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.user-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 10px 16px;
+  border-radius: 8px;
+  transition: all 0.3s;
+  color: #374151;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.user-name:hover {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+}
+
+.main-layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 260px;
+  background: white;
+  border-right: 1px solid #e5e7eb;
+  overflow-y: auto;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.03);
+}
+
+.sidebar-menu {
+  border: none;
+  height: 100%;
+  padding: 20px 0;
+}
+
+.sidebar-menu :deep(.el-menu-item),
+.sidebar-menu :deep(.el-sub-menu__title) {
+  height: 48px;
+  line-height: 48px;
+  padding: 0 24px !important;
+  margin: 2px 12px;
+  border-radius: 8px;
+  transition: all 0.3s;
+  font-weight: 500;
+}
+
+.sidebar-menu :deep(.el-menu-item:hover) {
+  background: #f0f9ff !important;
+  color: #1e40af !important;
+}
+
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  background: #dbeafe !important;
+  color: #1e40af !important;
+  font-weight: 600;
+}
+
+.sidebar-menu :deep(.el-menu-item .el-icon) {
+  font-size: 18px;
+  width: 18px;
+  margin-right: 12px;
+}
+
+.content-area {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+  background: #f8fafc;
+  min-height: calc(100vh - 64px);
+}
+
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 240px;
+  }
+
+  .content-area {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 220px;
+  }
+
+  .header {
+    padding: 0 20px;
+  }
+
+  .header-left h1 {
+    font-size: 20px;
+  }
+
+  .content-area {
+    padding: 20px;
+  }
+
+  .sidebar-menu :deep(.el-menu-item),
+  .sidebar-menu :deep(.el-sub-menu__title) {
+    padding: 0 20px !important;
+    margin: 2px 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .sidebar {
+    width: 200px;
+  }
+
+  .header {
+    padding: 0 16px;
+    height: 56px;
+  }
+
+  .header-left h1 {
+    font-size: 18px;
+  }
+
+  .header-right {
+    gap: 12px;
+  }
+
+  .user-name {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+
+  .content-area {
+    padding: 16px;
+  }
+}
+
 /* 个人信息页面样式 */
 .profile-page {
   display: flex;
@@ -729,104 +1096,4 @@ onMounted(() => {
 }
 
 .profile-card,
-.security-card,
-.data-card {
-  margin-bottom: 0;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.profile-content {
-  display: flex;
-  gap: 32px;
-}
-
-.avatar-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
-.avatar-actions {
-  text-align: center;
-}
-
-.info-section {
-  flex: 1;
-}
-
-.security-item,
-.data-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.security-item:last-child,
-.data-item:last-child {
-  border-bottom: none;
-}
-
-.security-info,
-.data-info {
-  flex: 1;
-}
-
-.security-title,
-.data-title {
-  font-weight: 500;
-  color: #303133;
-  margin-bottom: 4px;
-}
-
-.security-desc,
-.data-desc {
-  font-size: 12px;
-  color: #909399;
-}
-
-.avatar-upload-content {
-  text-align: center;
-}
-
-.avatar-preview {
-  margin-bottom: 20px;
-}
-
-.avatar-upload-actions {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-}
-
-/* 系统设置页面样式 */
-.system-settings-page h2 {
-  margin: 0;
-  color: #303133;
-  font-weight: 600;
-}
-
-.dialog-footer {
-  text-align: right;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .profile-content {
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  .avatar-section {
-    order: -1;
-  }
-}
 </style>
