@@ -1,0 +1,174 @@
+.simple-app {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.dashboard {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 32px;
+  height: 64px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  position: relative;
+  z-index: 100;
+}
+
+.header-left h1 {
+  color: #1e40af;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.user-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 10px 16px;
+  border-radius: 8px;
+  transition: all 0.3s;
+  color: #374151;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.user-name:hover {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+}
+
+.main-layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 260px;
+  background: white;
+  border-right: 1px solid #e5e7eb;
+  overflow-y: auto;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.03);
+}
+
+.sidebar-menu {
+  border: none;
+  height: 100%;
+  padding: 20px 0;
+}
+
+.sidebar-menu :deep(.el-menu-item),
+.sidebar-menu :deep(.el-sub-menu__title) {
+  height: 48px;
+  line-height: 48px;
+  padding: 0 24px !important;
+  margin: 2px 12px;
+  border-radius: 8px;
+  transition: all 0.3s;
+  font-weight: 500;
+}
+
+.sidebar-menu :deep(.el-menu-item:hover) {
+  background: #f0f9ff !important;
+  color: #1e40af !important;
+}
+
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  background: #dbeafe !important;
+  color: #1e40af !important;
+  font-weight: 600;
+}
+
+.sidebar-menu :deep(.el-menu-item .el-icon) {
+  font-size: 18px;
+  width: 18px;
+  margin-right: 12px;
+}
+
+.content-area {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+  background: #f8fafc;
+  min-height: calc(100vh - 64px);
+}
+
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 240px;
+  }
+
+  .content-area {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 220px;
+  }
+
+  .header {
+    padding: 0 20px;
+  }
+
+  .header-left h1 {
+    font-size: 20px;
+  }
+
+  .content-area {
+    padding: 20px;
+  }
+
+  .sidebar-menu :deep(.el-menu-item),
+  .sidebar-menu :deep(.el-sub-menu__title) {
+    padding: 0 20px !important;
+    margin: 2px 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .sidebar {
+    width: 200px;
+  }
+
+  .header {
+    padding: 0 16px;
+    height: 56px;
+  }
+
+  .header-left h1 {
+    font-size: 18px;
+  }
+
+  .header-right {
+    gap: 12px;
+  }
+
+  .user-name {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+
+  .content-area {
+    padding: 16px;
+  }
+}

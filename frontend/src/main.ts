@@ -4,8 +4,10 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
-import router from './router/working'
+import router from './router/index'
 import '@/styles/index.scss'
+import { setupPermissionDirective } from '@/directives/permission'
+import PermissionGuard from '@/components/PermissionGuard.vue'
 
 // 创建应用实例
 const app = createApp(App)
@@ -18,12 +20,18 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 // 创建Pinia状态管理
 const pinia = createPinia()
 
+// 注册全局组件
+app.component('PermissionGuard', PermissionGuard)
+
 // 注册插件
 app.use(pinia)
 app.use(router)
 app.use(ElementPlus, {
   size: 'default'
 })
+
+// 注册权限指令
+setupPermissionDirective(app)
 
 // 挂载路由
 app.mount('#app')

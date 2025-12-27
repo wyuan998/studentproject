@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学生信息管理系统 - 登录</title>
+    <link rel="icon" href="/favicon.ico">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .logo p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            color: #ef4444;
+            font-size: 14px;
+            margin-top: 15px;
+            padding: 10px;
+            background: #fef2f2;
+            border-radius: 6px;
+            border-left: 4px solid #ef4444;
+        }
+
+        .success-message {
+            color: #10b981;
+            font-size: 14px;
+            margin-top: 15px;
+            padding: 10px;
+            background: #f0fdf4;
+            border-radius: 6px;
+            border-left: 4px solid #10b981;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .demo-accounts {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .demo-accounts h3 {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+
+        .demo-btn {
+            padding: 8px 12px;
+            margin: 5px;
+            font-size: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .demo-btn:hover {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+        }
+
+        .demo-btn.admin { border-color: #ef4444; color: #ef4444; }
+        .demo-btn.student { border-color: #3b82f6; color: #3b82f6; }
+        .demo-btn.teacher { border-color: #10b981; color: #10b981; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>学生信息管理系统</h1>
+            <p>Student Management System</p>
+        </div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    placeholder="请输入用户名"
+                    value="admin"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="请输入密码"
+                    value="123456"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="login-btn" id="loginBtn">
+                登录
+            </button>
+        </form>
+
+        <div id="message"></div>
+
+        <div class="demo-accounts">
+            <h3>快速登录测试账号：</h3>
+            <button class="demo-btn admin" onclick="quickLogin('admin', '123456')">
+                管理员 (admin)
+            </button>
+            <button class="demo-btn student" onclick="quickLogin('student', '123456')">
+                学生 (student)
+            </button>
+            <button class="demo-btn teacher" onclick="quickLogin('teacher', '123456')">
+                教师 (teacher)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let authToken = null;
+
+        // 存储用户信息
+        function saveUserInfo(userData) {
+            localStorage.setItem('token', userData.access_token);
+            localStorage.setItem('refreshToken', userData.refresh_token);
+            localStorage.setItem('userInfo', JSON.stringify(userData.user_info));
+        }
+
+        // 快速登录
+        function quickLogin(username, password) {
+            document.getElementById('username').value = username;
+            document.getElementById('password').value = password;
+            document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+        }
+
+        // 登录函数
+        async function login(event) {
+            event.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const messageDiv = document.getElementById('message');
+
+            // 基本验证
+            if (!username || !password) {
+                showMessage('请输入用户名和密码', 'error');
+                return;
+            }
+
+            if (username.length < 3) {
+                showMessage('用户名长度至少为3位', 'error');
+                return;
+            }
+
+            // 禁用登录按钮
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<span class="loading"></span>登录中...';
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // 保存用户信息
+                    saveUserInfo(data.data);
+                    currentUser = data.data.user_info;
+                    authToken = data.data.access_token;
+
+                    showMessage(`登录成功！欢迎，${data.data.user_info.real_name}`, 'success');
+
+                    // 1秒后跳转
+                    setTimeout(() => {
+                        if (currentUser.roles.includes('admin')) {
+                            // 管理员跳转到管理界面
+                            window.location.href = '/admin/dashboard';
+                        } else if (currentUser.roles.includes('teacher')) {
+                            // 教师跳转到教师界面
+                            window.location.href = '/teacher/dashboard';
+                        } else {
+                            // 学生跳转到学生界面
+                            window.location.href = '/student/dashboard';
+                        }
+                    }, 1000);
+
+                } else {
+                    showMessage(data.message || '登录失败', 'error');
+                }
+
+            } catch (error) {
+                console.error('登录错误:', error);
+
+                if (error.message.includes('Failed to fetch')) {
+                    showMessage('网络连接失败，请检查后端服务', 'error');
+                } else {
+                    showMessage('登录失败，请稍后重试', 'error');
+                }
+            } finally {
+                // 恢复登录按钮
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = '登录';
+            }
+        }
+
+        // 显示消息
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+        }
+
+        // 绑听表单提交
+        document.getElementById('loginForm').addEventListener('submit', login);
+
+        // 检查是否已登录
+        function checkLoginStatus() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                const userInfo = localStorage.getItem('userInfo');
+                if (userInfo) {
+                    try {
+                        const userData = JSON.parse(userInfo);
+                        showMessage(`您已登录，欢迎回来 ${userData.real_name}！`, 'success');
+                        // 可以直接跳转或显示跳转按钮
+                        setTimeout(() => {
+                            if (userData.roles && userData.roles.includes('admin')) {
+                                window.location.href = '/admin/dashboard';
+                            } else if (userData.roles && userData.roles.includes('teacher')) {
+                                window.location.href = '/teacher/dashboard';
+                            } else {
+                                window.location.href = '/student/dashboard';
+                            }
+                        }, 1000);
+                    } catch (e) {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('refreshToken');
+                        localStorage.removeItem('userInfo');
+                    }
+                }
+            }
+        }
+
+        // 页面加载时检查登录状态
+        window.addEventListener('load', checkLoginStatus);
+    </script>
+</body>
+</html>

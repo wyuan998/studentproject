@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>强制重置存储</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>强制重置存储</h1>
+    <p>这将清除所有本地存储数据并重置到初始状态</p>
+
+    <button onclick="resetStorage()">强制清除所有存储</button>
+    <button onclick="goToApp()">返回应用</button>
+
+    <div id="result"></div>
+
+    <script>
+        function resetStorage() {
+            try {
+                // 清除所有localStorage
+                const keys = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key) {
+                        keys.push(key + ': ' + localStorage.getItem(key));
+                        localStorage.removeItem(key);
+                    }
+                }
+
+                // 清除所有sessionStorage
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
+                    if (key) {
+                        sessionStorage.removeItem(key);
+                    }
+                }
+
+                document.getElementById('result').innerHTML =
+                    '<p class="success">✓ 存储已清除</p>' +
+                    '<p>清除的项目:</p>' +
+                    '<pre>' + JSON.stringify(keys, null, 2) + '</pre>';
+
+                console.log('存储已清除:', keys);
+            } catch (error) {
+                document.getElementById('result').innerHTML =
+                    '<p class="error">✗ 清除失败: ' + error.message + '</p>';
+            }
+        }
+
+        function goToApp() {
+            window.location.href = '/';
+        }
+
+        // 显示当前存储状态
+        function showCurrentStorage() {
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key) {
+                    keys.push(key + ': ' + localStorage.getItem(key));
+                }
+            }
+
+            document.getElementById('result').innerHTML =
+                '<h3>当前存储状态:</h3>' +
+                '<pre>' + JSON.stringify(keys, null, 2) + '</pre>';
+        }
+
+        // 页面加载时显示当前状态
+        window.onload = showCurrentStorage;
+    </script>
+</body>
+</html>

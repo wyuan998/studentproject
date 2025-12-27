@@ -19,9 +19,6 @@ export const useUserStore = defineStore('user', () => {
   const isAdmin = computed(() => roles.value.includes('admin'))
   const isTeacher = computed(() => roles.value.includes('teacher'))
   const isStudent = computed(() => roles.value.includes('student'))
-  const hasPermission = computed(() => (permission: string) => {
-    return permissions.value.includes(permission) || isAdmin.value
-  })
 
   // 登录
   const login = async (loginData: LoginFormData) => {
@@ -29,8 +26,8 @@ export const useUserStore = defineStore('user', () => {
       loginLoading.value = true
       const response = await authApi.login(loginData)
 
-      if (response.success) {
-        const { access_token, refresh_token, user_info: userInfoData } = response.data as LoginResponse
+      if (response.data.success) {
+        const { access_token, refresh_token, user_info: userInfoData } = response.data.data as LoginResponse
 
         token.value = access_token
         refreshToken.value = refresh_token
@@ -38,9 +35,17 @@ export const useUserStore = defineStore('user', () => {
         roles.value = userInfoData.roles || []
         permissions.value = userInfoData.permissions || []
 
-        // 保存到本地存储
+        console.log('登录成功，用户数据:', {
+          userInfoData,
+          roles: roles.value,
+          token: access_token
+        })
+
+        // 保存到本地存储 - 统一使用'user'作为key
         localStorage.setItem('token', access_token)
         localStorage.setItem('refreshToken', refresh_token)
+        localStorage.setItem('user', JSON.stringify(userInfoData))
+        // 为了兼容性，同时保存到userInfo
         localStorage.setItem('userInfo', JSON.stringify(userInfoData))
 
         ElMessage.success('登录成功')
@@ -48,16 +53,16 @@ export const useUserStore = defineStore('user', () => {
         // 根据角色跳转
         const redirect = router.currentRoute.value.query.redirect as string
         if (userInfoData.roles?.includes('admin')) {
-          router.replace(redirect || '/admin/dashboard')
+          router.replace(redirect || '/dashboard')
         } else if (userInfoData.roles?.includes('teacher')) {
-          router.replace(redirect || '/dashboard')
+          router.replace(redirect || '/teacher/dashboard')
         } else {
-          router.replace(redirect || '/dashboard')
+          router.replace(redirect || '/student/dashboard')
         }
 
         return true
       } else {
-        ElMessage.error(response.message || '登录失败')
+        ElMessage.error(response.data.message || '登录失败')
         return false
       }
     } catch (error: any) {
@@ -77,7 +82,7 @@ export const useUserStore = defineStore('user', () => {
 
       // 检查响应格式
       if (response.data?.success) {
-        ElMessage.success(response.data.message || '注册成功，请登录')
+        ElMessage.success(response.data?.message || '注册成功，请登录')
         return true
       } else {
         ElMessage.error(response.data?.message || '注册失败')
@@ -108,9 +113,10 @@ export const useUserStore = defineStore('user', () => {
       permissions.value = []
       roles.value = []
 
-      // 清除本地存储
+      // 清除本地存储 - 清除所有可能的key
       localStorage.removeItem('token')
       localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
       localStorage.removeItem('userInfo')
 
       ElMessage.success('已退出登录')
@@ -154,15 +160,15 @@ export const useUserStore = defineStore('user', () => {
     try {
       const response = await authApi.getUserInfo()
 
-      if (response.success) {
-        userInfo.value = response.data
-        roles.value = response.data.roles || []
-        permissions.value = response.data.permissions || []
+      if (response.data.success) {
+        userInfo.value = response.data.data
+        roles.value = response.data.data.roles || []
+        permissions.value = response.data.data.permissions || []
 
-        localStorage.setItem('userInfo', JSON.stringify(response.data))
+        localStorage.setItem('userInfo', JSON.stringify(response.data.data))
         return true
       } else {
-        throw new Error(response.message)
+        throw new Error(response.data.message)
       }
     } catch (error) {
       console.error('Get user info error:', error)
@@ -211,18 +217,128 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
+  // 权限检查方法
+  const checkUserPermission = (permission: string) => {
+    return permissions.value.includes(permission) || isAdmin.value
+  }
+
+  const hasAnyPermission = (permissionList: string[]) => {
+    return permissionList.some(permission => permissions.value.includes(permission) || isAdmin.value)
+  }
+
+  const hasAllPermissions = (permissionList: string[]) => {
+    return permissionList.every(permission => permissions.value.includes(permission) || isAdmin.value)
+  }
+
+  // 为了向后兼容，提供hasPermission别名
+  const hasPermission = checkUserPermission
+
+  const checkPermission = async (permission: string) => {
+    try {
+      const response = await fetch('/api/auth/check-permission', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token.value}`
+        },
+        body: JSON.stringify({ permission })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        return result.success ? result.data.has_permission : false
+      }
+      return false
+    } catch (error) {
+      console.error('权限检查错误:', error)
+      return false
+    }
+  }
+
+  const refreshPermissions = async () => {
+    try {
+      const response = await fetch('/api/auth/permissions', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token.value}`
+        }
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success) {
+          permissions.value = result.data.permissions
+          return true
+        }
+      }
+      return false
+    } catch (error) {
+      console.error('刷新权限错误:', error)
+      return false
+    }
+  }
+
   // 初始化用户信息（从本地存储恢复）
   const initUserInfo = () => {
-    const storedUserInfo = localStorage.getItem('userInfo')
+    console.log('=== 开始初始化用户信息 ===')
+
+    // 检查当前状态
+    console.log('当前userStore状态:', {
+      hasToken: !!token.value,
+      hasUserInfo: !!userInfo.value,
+      currentRoles: roles.value
+    })
+
+    const storedToken = localStorage.getItem('token')
+    // 修复：localStorage中保存的key是'user'，不是'userInfo'
+    const storedUserInfo = localStorage.getItem('userInfo') || localStorage.getItem('user')
+
+    // 调试：打印localStorage中的所有内容
+    console.log('localStorage完整内容:')
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key) {
+        console.log(`  ${key}: ${localStorage.getItem(key)}`)
+      }
+    }
+
+    console.log('初始化用户信息 - token:', storedToken, 'userInfo:', storedUserInfo)
+
+    // 如果已经有用户信息，就不重新初始化
+    if (userInfo.value && token.value) {
+      console.log('用户信息已存在，跳过初始化')
+      return
+    }
+
+    if (storedToken) {
+      token.value = storedToken
+    }
+
     if (storedUserInfo) {
       try {
         userInfo.value = JSON.parse(storedUserInfo)
+        // 修复：如果localStorage中有role但没有roles，则创建roles数组
+        if (userInfo.value?.role && !userInfo.value?.roles) {
+          userInfo.value.roles = [userInfo.value.role]
+        }
         roles.value = userInfo.value?.roles || []
         permissions.value = userInfo.value?.permissions || []
+        console.log('用户信息恢复成功:', {
+          userInfo: userInfo.value,
+          roles: roles.value,
+          role: userInfo.value?.role,
+          userInfoType: typeof userInfo.value,
+          rolesType: typeof roles.value
+        })
       } catch (error) {
         console.error('Parse user info error:', error)
+        console.error('Original userInfo string:', storedUserInfo)
+        localStorage.removeItem('user')
         localStorage.removeItem('userInfo')
+        localStorage.removeItem('token')
       }
+    } else {
+      console.log('没有找到用户信息，可能是首次访问')
     }
   }
 
@@ -240,7 +356,13 @@ export const useUserStore = defineStore('user', () => {
     isAdmin,
     isTeacher,
     isStudent,
+
+    // 权限检查方法
     hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
+    checkPermission,
+    refreshPermissions,
 
     // 方法
     login,

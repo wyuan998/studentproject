@@ -4,10 +4,21 @@
 
 import os
 import json
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import logging
 from datetime import datetime
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# 导入新的工具模块
+try:
+    from utils.file_handler import FileHandler
+    from utils.privacy import PrivacyFilter, AuditLogger
+except ImportError:
+    print("Warning: 无法导入工具模块，将使用简化版功能")
+    FileHandler = None
+    PrivacyFilter = None
 
 # 创建Flask应用
 app = Flask(__name__)
@@ -16,10 +27,10 @@ app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # 确保中文字符正确编码
 app.config['JSON_SORT_KEYS'] = False
 
-# 配置CORS - 支持localhost:3000, 3001, 3002并允许所有必要的方法和头
+# 配置CORS - 支持localhost:3000-3005并允许所有必要的方法和头
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003"],
+        "origins": ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003", "http://localhost:3004", "http://localhost:3005"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
         "supports_credentials": True
@@ -30,12 +41,133 @@ CORS(app, resources={
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# 初始化文件处理器
+if FileHandler:
+    file_handler = FileHandler()
+
 # 模拟数据存储
 users = []
 students = []
 teachers = []
 courses = []
 grades = []
+profile_history = []  # 个人信息变更历史
+
+# 权限配置
+ROLE_PERMISSIONS = {
+    'admin': [
+        'read', 'write', 'delete', 'manage_users', 'manage_courses',
+        'manage_grades', 'system_settings', 'view_all_students', 'view_all_teachers',
+        'view_all_courses', 'manage_system', 'export_data', 'import_data'
+    ],
+    'teacher': [
+        'read', 'write', 'manage_own_courses', 'manage_grades', 'view_students',
+        'view_assigned_courses', 'edit_own_profile', 'publish_grades'
+    ],
+    'student': [
+        'read', 'view_own_grades', 'view_own_courses', 'edit_own_profile',
+        'view_enrolled_courses', 'select_courses', 'drop_courses'
+    ]
+}
+
+# 权限等级配置（用于权限比较）
+ROLE_HIERARCHY = {
+    'admin': 100,
+    'teacher': 50,
+    'student': 10
+}
+
+def get_role_permissions(role):
+    """根据角色返回权限列表"""
+    return ROLE_PERMISSIONS.get(role, ['read'])
+
+def check_permission(user_role: str, required_permission: str) -> bool:
+    """检查用户是否具有指定权限"""
+    user_permissions = get_role_permissions(user_role)
+    return required_permission in user_permissions
+
+def check_role_hierarchy(user_role: str, required_role: str) -> bool:
+    """检查用户角色等级是否满足要求"""
+    return ROLE_HIERARCHY.get(user_role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
+
+def require_permission(permission):
+    """权限验证装饰器"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            # 在实际应用中，这里应该从JWT token中获取用户信息
+            # 这里简化处理，从请求中获取用户信息
+            auth_header = request.headers.get('Authorization')
+            if not auth_header:
+                return jsonify({
+                    'success': False,
+                    'message': '缺少认证信息'
+                }), 401
+
+            # 模拟从token中解析用户信息
+            # 在实际应用中，应该验证JWT token
+            try:
+                token = auth_header.replace('Bearer ', '')
+                # 简化处理：根据token模拟用户角色
+                if 'admin' in token.lower():
+                    user_role = 'admin'
+                elif 'teacher' in token.lower():
+                    user_role = 'teacher'
+                else:
+                    user_role = 'student'
+            except:
+                return jsonify({
+                    'success': False,
+                    'message': '无效的认证信息'
+                }), 401
+
+            # 检查权限
+            if not check_permission(user_role, permission):
+                return jsonify({
+                    'success': False,
+                    'message': f'权限不足，需要权限: {permission}'
+                }), 403
+
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def require_role(required_role):
+    """角色验证装饰器"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            # 在实际应用中，这里应该从JWT token中获取用户信息
+            auth_header = request.headers.get('Authorization')
+            if not auth_header:
+                return jsonify({
+                    'success': False,
+                    'message': '缺少认证信息'
+                }), 401
+
+            # 模拟从token中解析用户角色
+            try:
+                token = auth_header.replace('Bearer ', '')
+                if 'admin' in token.lower():
+                    user_role = 'admin'
+                elif 'teacher' in token.lower():
+                    user_role = 'teacher'
+                else:
+                    user_role = 'student'
+            except:
+                return jsonify({
+                    'success': False,
+                    'message': '无效的认证信息'
+                }), 401
+
+            # 检查角色等级
+            if not check_role_hierarchy(user_role, required_role):
+                return jsonify({
+                    'success': False,
+                    'message': f'角色等级不足，需要角色: {required_role} 或更高'
+                }), 403
+
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 # 初始化一些示例数据
 def init_sample_data():
@@ -628,15 +760,19 @@ def login():
                 break
 
         if user:
+            # 根据角色设置不同的权限
+            role = user.get('role', 'student')
+            permissions = get_role_permissions(role)
+
             # 构建响应数据
             user_data = {
                 'id': user['id'],
                 'username': user['username'],
                 'real_name': user.get('real_name', user['username']),
                 'email': user.get('email', ''),
-                'role': user.get('role', 'student'),
-                'permissions': ['read', 'write'],  # 简化的权限
-                'roles': [user.get('role', 'student')]
+                'role': role,
+                'permissions': permissions,
+                'roles': [role]
             }
 
             return jsonify({
@@ -900,6 +1036,34 @@ def get_students():
     if request.method == 'OPTIONS':
         return '', 200
 
+    # 权限检查 - 获取学生列表需要相应权限
+    auth_header = request.headers.get('Authorization')
+    if auth_header:
+        # 如果有认证信息，检查权限
+        if 'admin' in auth_header:
+            required_permission = 'view_all_students'
+        elif 'teacher' in auth_header:
+            required_permission = 'view_students'
+        else:
+            required_permission = 'read'
+
+        try:
+            token = auth_header.replace('Bearer ', '')
+            if 'admin' in token.lower():
+                user_role = 'admin'
+            elif 'teacher' in token.lower():
+                user_role = 'teacher'
+            else:
+                user_role = 'student'
+
+            if not check_permission(user_role, required_permission):
+                return jsonify({
+                    'success': False,
+                    'message': f'权限不足，需要权限: {required_permission}'
+                }), 403
+        except:
+            pass  # 如果token解析失败，继续执行（允许公开访问基础信息）
+
     try:
         page = request.args.get('page', 1, type=int)
         page_size = request.args.get('pageSize', 20, type=int)
@@ -937,6 +1101,17 @@ def get_students():
 @app.route('/api/students', methods=['POST'])
 def create_student():
     """创建学生"""
+    # 权限检查 - 创建学生需要管理员权限
+    auth_header = request.headers.get('Authorization')
+
+    # 简化权限检查：如果有Authorization header就允许通过
+    # 在实际应用中应该解析JWT token验证用户角色
+    if not auth_header:
+        return jsonify({
+            'success': False,
+            'message': '权限不足，只有管理员可以创建学生'
+        }), 403
+
     try:
         logger.info("收到创建学生请求")
 
@@ -1177,6 +1352,17 @@ def get_teachers():
 @app.route('/api/teachers', methods=['POST'])
 def create_teacher():
     """创建教师"""
+    # 权限检查 - 创建教师需要管理员权限
+    auth_header = request.headers.get('Authorization')
+
+    # 简化权限检查：如果有Authorization header就允许通过
+    # 在实际应用中应该解析JWT token验证用户角色
+    if not auth_header:
+        return jsonify({
+            'success': False,
+            'message': '权限不足，只有管理员可以创建教师'
+        }), 403
+
     try:
         logger.info("收到创建教师请求")
 
@@ -2024,6 +2210,441 @@ def get_grade_statistics():
             'message': f'获取成绩统计失败: {str(e)}'
         }), 500
 
+# 个人信息增强路由
+@app.route('/api/auth/profile', methods=['GET'])
+def get_profile():
+    """获取当前用户的完整个人信息"""
+    try:
+        # 模拟获取当前用户ID（实际应该从token中获取）
+        current_user_id = request.args.get('user_id', 1, type=int)
+        viewer_role = request.args.get('viewer_role', 'self')  # self/teacher/admin
+
+        # 查找用户信息
+        user = next((u for u in users if u.get('id') == current_user_id), None)
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        # 模拟构建完整的个人信息
+        profile = {
+            'id': user['id'],
+            'username': user['username'],
+            'real_name': user.get('real_name', ''),
+            'email': user.get('email', ''),
+            'phone': '13800138000',  # 示例手机号
+            'gender': '男',
+            'birthday': '2000-01-01',
+            'address': '北京市海淀区中关村大街1号',
+            'city': '北京市',
+            'province': '北京',
+            'postal_code': '100000',
+            'department': '计算机学院',
+            'major': '计算机科学与技术',
+            'degree': '本科',
+            'student_id': 'S2021001',
+            'employee_id': 'T001',
+            'join_date': '2021-09-01',
+            'role': user['role'],
+            'status': user.get('status', 'active'),
+            'avatar_url': user.get('avatar_url', ''),
+            'created_at': user.get('created_at', ''),
+            'last_login': datetime.now().isoformat()
+        }
+
+        # 应用隐私过滤
+        if PrivacyFilter:
+            profile = PrivacyFilter.filter_user_data(
+                profile,
+                viewer_role=viewer_role,
+                include_sensitive=(viewer_role == 'self' or viewer_role == 'admin')
+            )
+
+        # 记录访问日志
+        if PrivacyFilter:
+            PrivacyFilter.AuditLogger.log_data_access(
+                user_id=1,  # 访问者ID
+                target_id=current_user_id,
+                action='view',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', ''),
+                accessed_fields=list(profile.keys())
+            )
+
+        return jsonify({
+            'success': True,
+            'data': profile
+        })
+
+    except Exception as e:
+        logger.error(f"获取个人信息错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取个人信息失败'
+        }), 500
+
+@app.route('/api/auth/profile', methods=['PUT'])
+def update_profile():
+    """更新个人信息"""
+    try:
+        data = request.get_json()
+        current_user_id = data.get('id', 1)
+
+        # 查找用户
+        user_index = -1
+        for i, u in enumerate(users):
+            if u.get('id') == current_user_id:
+                user_index = i
+                break
+
+        if user_index == -1:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        # 记录变更前的数据
+        old_data = users[user_index].copy()
+
+        # 更新用户基本信息
+        if 'real_name' in data:
+            users[user_index]['real_name'] = data['real_name']
+        if 'email' in data:
+            users[user_index]['email'] = data['email']
+        if 'phone' in data:
+            users[user_index]['phone'] = data['phone']
+
+        # 添加变更历史记录
+        change_record = {
+            'id': len(profile_history) + 1,
+            'user_id': current_user_id,
+            'timestamp': datetime.now().isoformat(),
+            'changes': [],
+            'ip_address': request.remote_addr,
+            'user_agent': request.headers.get('User-Agent', '')
+        }
+
+        # 记录具体变更
+        for key, value in data.items():
+            if key in old_data and old_data[key] != value:
+                change_record['changes'].append({
+                    'field': key,
+                    'old_value': old_data[key],
+                    'new_value': value
+                })
+
+        if change_record['changes']:
+            profile_history.append(change_record)
+
+        # 记录审计日志
+        if PrivacyFilter:
+            PrivacyFilter.AuditLogger.log_data_access(
+                user_id=current_user_id,
+                target_id=current_user_id,
+                action='update',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', ''),
+                accessed_fields=list(data.keys())
+            )
+
+        return jsonify({
+            'success': True,
+            'message': '个人信息更新成功',
+            'data': users[user_index]
+        })
+
+    except Exception as e:
+        logger.error(f"更新个人信息错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '更新个人信息失败'
+        }), 500
+
+@app.route('/api/auth/avatar', methods=['POST'])
+def upload_avatar():
+    """上传头像"""
+    try:
+        # 支持Base64和文件上传两种方式
+        if 'avatar' in request.form:
+            # Base64方式
+            import base64
+            avatar_data = request.form['avatar']
+            # 移除data:image/...;base64,前缀
+            if avatar_data.startswith('data:image'):
+                avatar_data = avatar_data.split(',')[1]
+            file_data = base64.b64decode(avatar_data)
+            filename = f"avatar_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+            current_user_id = request.form.get('user_id', 1, type=int)
+
+            if file_handler:
+                result = file_handler.save_avatar(file_data, filename, current_user_id)
+            else:
+                # 模拟返回
+                result = {
+                    'file_url': '/api/files/avatars/default.jpg',
+                    'filename': filename,
+                    'file_size': len(file_data)
+                }
+        elif 'avatar' in request.files:
+            # 文件上传方式
+            if not file_handler:
+                return jsonify({
+                    'success': False,
+                    'message': '文件上传功能不可用'
+                }), 500
+
+            file = request.files['avatar']
+            if file.filename == '':
+                return jsonify({
+                    'success': False,
+                    'message': '没有选择文件'
+                }), 400
+
+            # 读取文件数据
+            file_data = file.read()
+            file.seek(0)
+
+            # 保存文件
+            current_user_id = request.form.get('user_id', 1, type=int)
+            result = file_handler.save_avatar(file_data, file.filename, current_user_id)
+        else:
+            return jsonify({
+                'success': False,
+                'message': '请提供头像数据'
+            }), 400
+
+        # 更新用户头像URL
+        user_index = -1
+        for i, u in enumerate(users):
+            if u.get('id') == current_user_id:
+                user_index = i
+                users[user_index]['avatar_url'] = result['file_url']
+                break
+
+        # 记录审计日志
+        if PrivacyFilter:
+            PrivacyFilter.AuditLogger.log_data_access(
+                user_id=current_user_id,
+                target_id=current_user_id,
+                action='update',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', ''),
+                accessed_fields=['avatar_url']
+            )
+
+        return jsonify({
+            'success': True,
+            'message': '头像上传成功',
+            'data': result
+        })
+
+    except Exception as e:
+        logger.error(f"上传头像错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'上传头像失败: {str(e)}'
+        }), 500
+
+@app.route('/api/files/avatars/<filename>', methods=['GET'])
+def get_avatar(filename):
+    """获取头像文件"""
+    try:
+        avatar_path = os.path.join(file_handler.upload_folder, 'avatars', filename) if file_handler else None
+        if not avatar_path or not os.path.exists(avatar_path):
+            return jsonify({
+                'success': False,
+                'message': '文件不存在'
+            }), 404
+
+        return send_file(avatar_path)
+
+    except Exception as e:
+        logger.error(f"获取头像错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取文件失败'
+        }), 500
+
+@app.route('/api/auth/profile/history', methods=['GET'])
+def get_profile_history():
+    """获取个人信息变更历史"""
+    try:
+        current_user_id = request.args.get('user_id', 1, type=int)
+
+        # 获取用户的变更历史
+        user_history = [h for h in profile_history if h.get('user_id') == current_user_id]
+        user_history.sort(key=lambda x: x['timestamp'], reverse=True)
+
+        return jsonify({
+            'success': True,
+            'data': user_history
+        })
+
+    except Exception as e:
+        logger.error(f"获取变更历史错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取变更历史失败'
+        }), 500
+
+@app.route('/api/auth/profile/export', methods=['GET'])
+def export_profile():
+    """导出个人信息"""
+    try:
+        current_user_id = request.args.get('user_id', 1, type=int)
+        export_format = request.args.get('format', 'json')
+
+        # 获取个人信息
+        user = next((u for u in users if u.get('id') == current_user_id), None)
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        profile = {
+            '个人信息': {
+                '姓名': user.get('real_name', ''),
+                '用户名': user['username'],
+                '邮箱': user.get('email', ''),
+                '手机': '13800138000',
+                '性别': '男',
+                '生日': '2000-01-01'
+            },
+            '教育信息': {
+                '部门': '计算机学院',
+                '专业': '计算机科学与技术',
+                '学位': '本科',
+                '学号': 'S2021001'
+            },
+            '地址信息': {
+                '地址': '北京市海淀区中关村大街1号',
+                '城市': '北京市',
+                '省份': '北京',
+                '邮编': '100000'
+            },
+            '系统信息': {
+                '角色': user['role'],
+                '状态': user.get('status', 'active'),
+                '注册时间': user.get('created_at', ''),
+                '最后登录': datetime.now().isoformat()
+            }
+        }
+
+        if export_format == 'json':
+            return jsonify({
+                'success': True,
+                'data': profile
+            })
+        else:
+            # 这里可以添加其他格式的导出，如PDF、CSV等
+            return jsonify({
+                'success': False,
+                'message': f'不支持的导出格式: {export_format}'
+            }), 400
+
+    except Exception as e:
+        logger.error(f"导出个人信息错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '导出失败'
+        }), 500
+
+@app.route('/api/auth/change-password', methods=['POST'])
+def change_password():
+    """修改密码"""
+    try:
+        data = request.get_json()
+        current_user_id = data.get('user_id', 1)
+
+        old_password = data.get('old_password')
+        new_password = data.get('new_password')
+        confirm_password = data.get('confirm_password')
+
+        # 验证必填字段
+        if not all([old_password, new_password, confirm_password]):
+            return jsonify({
+                'success': False,
+                'message': '请填写完整的密码信息'
+            }), 400
+
+        # 验证新密码确认
+        if new_password != confirm_password:
+            return jsonify({
+                'success': False,
+                'message': '两次输入的新密码不一致'
+            }), 400
+
+        # 验证新密码强度
+        if len(new_password) < 8:
+            return jsonify({
+                'success': False,
+                'message': '新密码长度不能少于8位'
+            }), 400
+
+        # 查找用户
+        user_index = -1
+        for i, u in enumerate(users):
+            if u.get('id') == current_user_id:
+                user_index = i
+                break
+
+        if user_index == -1:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        # 验证旧密码（实际应该使用加密验证）
+        if users[user_index].get('password') != old_password:
+            return jsonify({
+                'success': False,
+                'message': '原密码不正确'
+            }), 400
+
+        # 更新密码（实际应该加密存储）
+        users[user_index]['password'] = new_password
+        users[user_index]['updated_at'] = datetime.now().isoformat()
+
+        # 记录密码变更历史
+        change_record = {
+            'id': len(profile_history) + 1,
+            'user_id': current_user_id,
+            'timestamp': datetime.now().isoformat(),
+            'changes': [{
+                'field': 'password',
+                'old_value': '******',
+                'new_value': '******'
+            }],
+            'ip_address': request.remote_addr,
+            'user_agent': request.headers.get('User-Agent', '')
+        }
+        profile_history.append(change_record)
+
+        # 记录审计日志
+        if PrivacyFilter:
+            PrivacyFilter.AuditLogger.log_data_access(
+                user_id=current_user_id,
+                target_id=current_user_id,
+                action='update',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', ''),
+                accessed_fields=['password']
+            )
+
+        return jsonify({
+            'success': True,
+            'message': '密码修改成功'
+        })
+
+    except Exception as e:
+        logger.error(f"修改密码错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '修改密码失败'
+        }), 500
+
 # 用户信息路由
 @app.route('/api/auth/user', methods=['GET'])
 def get_user_info():
@@ -2051,6 +2672,92 @@ def logout():
         'message': '退出成功'
     })
 
+@app.route('/api/auth/permissions', methods=['GET'])
+def get_user_permissions():
+    """获取当前用户的权限列表"""
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({
+                'success': False,
+                'message': '缺少认证信息'
+            }), 401
+
+        # 模拟从token中解析用户信息
+        token = auth_header.replace('Bearer ', '')
+        if 'admin' in token.lower():
+            user_role = 'admin'
+        elif 'teacher' in token.lower():
+            user_role = 'teacher'
+        else:
+            user_role = 'student'
+
+        permissions = get_role_permissions(user_role)
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'role': user_role,
+                'permissions': permissions,
+                'hierarchy_level': ROLE_HIERARCHY.get(user_role, 0)
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"获取权限信息错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取权限信息失败'
+        }), 500
+
+@app.route('/api/auth/check-permission', methods=['POST'])
+def check_user_permission():
+    """检查用户是否具有特定权限"""
+    try:
+        data = request.get_json()
+        required_permission = data.get('permission')
+
+        if not required_permission:
+            return jsonify({
+                'success': False,
+                'message': '缺少权限参数'
+            }), 400
+
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({
+                'success': False,
+                'message': '缺少认证信息'
+            }), 401
+
+        # 模拟从token中解析用户信息
+        token = auth_header.replace('Bearer ', '')
+        if 'admin' in token.lower():
+            user_role = 'admin'
+        elif 'teacher' in token.lower():
+            user_role = 'teacher'
+        else:
+            user_role = 'student'
+
+        has_permission = check_permission(user_role, required_permission)
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'has_permission': has_permission,
+                'user_role': user_role,
+                'required_permission': required_permission,
+                'user_permissions': get_role_permissions(user_role)
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"权限检查错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '权限检查失败'
+        }), 500
+
 # 错误处理
 @app.errorhandler(404)
 def not_found(error):
@@ -2065,6 +2772,286 @@ def internal_error(error):
         'success': False,
         'message': '服务器内部错误'
     }), 500
+
+# 用户个人数据路由
+@app.route('/api/user/profile', methods=['GET', 'OPTIONS'])
+def get_user_profile():
+    """获取当前用户的个人信息"""
+    # 处理OPTIONS预检请求
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        # 在实际应用中，这里应该从JWT token中获取用户ID
+        # 这里简化处理，从请求参数中获取用户ID
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'message': '用户ID不能为空'
+            }), 400
+
+        # 查找用户基本信息
+        user = None
+        for u in users:
+            if str(u['id']) == user_id:
+                user = u
+                break
+
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        # 根据角色返回不同的个人信息
+        role = user.get('role', 'student')
+        profile_data = {}
+
+        if role == 'student':
+            # 查找学生详细信息
+            for student in students:
+                if student['id'] == user['id']:
+                    profile_data = {
+                        'user_id': student['id'],
+                        'student_id': student['student_id'],
+                        'name': student['name'],
+                        'gender': student['gender'],
+                        'birth_date': student['birth_date'],
+                        'phone': student['phone'],
+                        'email': student['email'],
+                        'major': student['major'],
+                        'class_name': student['class_name'],
+                        'enrollment_date': student['enrollment_date'],
+                        'address': student['address'],
+                        'status': student['status']
+                    }
+                    break
+        elif role == 'teacher':
+            # 查找教师详细信息
+            for teacher in teachers:
+                if teacher['id'] == user['id']:
+                    profile_data = {
+                        'user_id': teacher['id'],
+                        'teacher_id': teacher['teacher_id'],
+                        'name': teacher['name'],
+                        'gender': teacher['gender'],
+                        'birth_date': teacher['birth_date'],
+                        'phone': teacher['phone'],
+                        'email': teacher['email'],
+                        'department': teacher['department'],
+                        'title': teacher['title'],
+                        'hire_date': teacher['hire_date'],
+                        'address': teacher['address'],
+                        'status': teacher['status']
+                    }
+                    break
+        else:
+            # 管理员信息
+            profile_data = {
+                'user_id': user['id'],
+                'name': user['real_name'],
+                'email': user['email'],
+                'role': user['role'],
+                'status': user.get('status', 'active')
+            }
+
+        return jsonify({
+            'success': True,
+            'data': profile_data
+        })
+
+    except Exception as e:
+        logger.error(f"获取用户信息错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取用户信息失败'
+        }), 500
+
+@app.route('/api/user/courses', methods=['GET', 'OPTIONS'])
+def get_user_courses():
+    """获取当前用户的课程信息"""
+    # 处理OPTIONS预检请求
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'message': '用户ID不能为空'
+            }), 400
+
+        # 查找用户
+        user = None
+        for u in users:
+            if str(u['id']) == user_id:
+                user = u
+                break
+
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        role = user.get('role', 'student')
+        user_courses = []
+
+        if role == 'student':
+            # 学生只能看到自己选择的课程
+            user_id_int = int(user_id)
+            student_courses = [
+                {
+                    'course_id': course['id'],
+                    'course_code': course['course_code'],
+                    'course_name': course['course_name'],
+                    'credits': course['credits'],
+                    'teacher_name': course['teacher_name'],
+                    'schedule': course['schedule'],
+                    'location': course['location'],
+                    'status': 'selected',
+                    'enrollment_date': '2024-09-01'
+                }
+                for course in courses
+                if user_id_int in [1, 2, 3]  # 简化：前三个学生选择了这些课程
+            ]
+            user_courses = student_courses
+
+        elif role == 'teacher':
+            # 教师可以看到自己教授的课程
+            teacher_id_map = {1: 1, 2: 2, 3: 3, 4: 3, 5: 5, 6: 6}
+            teacher_course_id = teacher_id_map.get(int(user_id), 1)
+
+            user_courses = [
+                {
+                    'course_id': course['id'],
+                    'course_code': course['course_code'],
+                    'course_name': course['course_name'],
+                    'credits': course['credits'],
+                    'hours': course['hours'],
+                    'course_type': course['course_type'],
+                    'max_students': course['max_students'],
+                    'current_students': course['current_students'],
+                    'schedule': course['schedule'],
+                    'location': course['location'],
+                    'status': course['status'],
+                    'semester': course['semester']
+                }
+                for course in courses
+                if course['teacher_id'] == teacher_course_id
+            ]
+
+        else:
+            # 管理员可以看到所有课程
+            user_courses = courses
+
+        return jsonify({
+            'success': True,
+            'data': user_courses
+        })
+
+    except Exception as e:
+        logger.error(f"获取用户课程错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取课程信息失败'
+        }), 500
+
+@app.route('/api/user/grades', methods=['GET', 'OPTIONS'])
+def get_user_grades():
+    """获取当前用户的成绩信息"""
+    # 处理OPTIONS预检请求
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'message': '用户ID不能为空'
+            }), 400
+
+        # 查找用户
+        user = None
+        for u in users:
+            if str(u['id']) == user_id:
+                user = u
+                break
+
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+
+        role = user.get('role', 'student')
+        user_grades = []
+
+        if role == 'student':
+            # 学生只能看到自己的成绩
+            user_id_int = int(user_id)
+            student_grades = [
+                {
+                    'grade_id': grade['id'],
+                    'course_name': grade['course_name'],
+                    'exam_type': grade['exam_type'],
+                    'score': grade['score'],
+                    'max_score': grade['max_score'],
+                    'percentage': grade['percentage'],
+                    'letter_grade': grade['letter_grade'],
+                    'grade_point': grade['grade_point'],
+                    'semester': grade['semester'],
+                    'is_published': grade['is_published'],
+                    'comments': grade.get('comments', ''),
+                    'graded_at': grade.get('graded_at', '')
+                }
+                for grade in grades
+                if grade['student_id'] == f"S202100{user_id_int}"  # 匹配学生学号
+            ]
+            user_grades = student_grades
+
+        elif role == 'teacher':
+            # 教师可以看到自己教授的课程的学生成绩
+            teacher_course_map = {1: [1], 2: [2], 3: [3]}  # 简化映射
+            teacher_courses = teacher_course_map.get(int(user_id), [1])
+
+            user_grades = [
+                {
+                    'grade_id': grade['id'],
+                    'student_name': grade['student_name'],
+                    'student_id': grade['student_id'],
+                    'course_name': grade['course_name'],
+                    'exam_type': grade['exam_type'],
+                    'score': grade['score'],
+                    'max_score': grade['max_score'],
+                    'percentage': grade['percentage'],
+                    'letter_grade': grade['letter_grade'],
+                    'semester': grade['semester'],
+                    'is_published': grade['is_published'],
+                    'graded_at': grade.get('graded_at', '')
+                }
+                for grade in grades
+                if grade['course_id'] in teacher_courses
+            ]
+
+        else:
+            # 管理员可以看到所有成绩
+            user_grades = grades
+
+        return jsonify({
+            'success': True,
+            'data': user_grades
+        })
+
+    except Exception as e:
+        logger.error(f"获取用户成绩错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取成绩信息失败'
+        }), 500
 
 if __name__ == '__main__':
     print("=" * 50)

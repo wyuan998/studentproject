@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .success {
+            color: green;
+            margin-top: 10px;
+        }
+        .result {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h2>登录测试页面</h2>
+
+    <form id="loginForm">
+        <div class="form-group">
+            <label for="username">用户名:</label>
+            <input type="text" id="username" value="admin" required>
+        </div>
+
+        <div class="form-group">
+            <label for="password">密码:</label>
+            <input type="password" id="password" value="123456" required>
+        </div>
+
+        <button type="submit">登录</button>
+    </form>
+
+    <div id="error" class="error" style="display: none;"></div>
+    <div id="success" class="success" style="display: none;"></div>
+
+    <h3>快捷测试账号:</h3>
+    <button onclick="testLogin('admin', '123456')">测试管理员登录</button>
+    <button onclick="testLogin('student', '123456')">测试学生登录</button>
+    <button onclick="testLogin('teacher', '123456')">测试教师登录</button>
+
+    <h3>测试结果:</h3>
+    <div id="result" class="result">等待测试...</div>
+
+    <script>
+        async function testLogin(username, password) {
+            document.getElementById('username').value = username;
+            document.getElementById('password').value = password;
+            document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+        }
+
+        async function login(event) {
+            event.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('error');
+            const successDiv = document.getElementById('success');
+            const resultDiv = document.getElementById('result');
+
+            // 清除之前的消息
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+
+            try {
+                resultDiv.textContent = '正在登录...';
+
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                resultDiv.textContent = '响应状态: ' + response.status + '\n' +
+                                      '响应数据:\n' + JSON.stringify(data, null, 2);
+
+                if (data.success) {
+                    successDiv.textContent = '登录成功！用户: ' + data.data.user_info.real_name;
+                    successDiv.style.display = 'block';
+                    resultDiv.style.color = 'green';
+
+                    // 测试获取用户信息
+                    try {
+                        const userResponse = await fetch('/api/auth/me');
+                        const userData = await userResponse.json();
+                        resultDiv.textContent += '\n\n用户信息:\n' + JSON.stringify(userData, null, 2);
+                    } catch (userError) {
+                        console.error('获取用户信息失败:', userError);
+                    }
+                } else {
+                    errorDiv.textContent = data.message || '登录失败';
+                    errorDiv.style.display = 'block';
+                    resultDiv.style.color = 'red';
+                }
+
+            } catch (error) {
+                console.error('登录错误:', error);
+                errorDiv.textContent = '网络连接失败: ' + error.message;
+                errorDiv.style.display = 'block';
+                resultDiv.textContent = '请求失败: ' + error.message;
+                resultDiv.style.color = 'red';
+            }
+        }
+
+        // 绑听表单提交
+        document.getElementById('loginForm').addEventListener('submit', login);
+
+        // 页面加载时测试连接
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                resultDiv.textContent = '服务器连接测试:\n' + JSON.stringify(data, null, 2);
+                resultDiv.style.color = 'blue';
+            } catch (error) {
+                resultDiv.textContent = '无法连接到服务器: ' + error.message;
+                resultDiv.style.color = 'red';
+            }
+        });
+    </script>
+</body>
+</html>
